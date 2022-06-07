@@ -1,0 +1,40 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "NomaTo API",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "node.js",
+    "express",
+    "jwt",
+    "authentication",
+    "mongodb"
+  ],
+  "author": "max.u",
+  "license": "ISC",
+  "dependencies": {
+    "@ladjs/graceful": "^2.0.1",
+    "@stripe/stripe-js": "^1.29.0",
+    "axios": "^0.27.2",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.0",
+    "bree": "^8.0.3",
+    "cabin": "^9.1.2",
+    "cors": "^2.8.5",
+    "date-fns": "^2.28.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.3",
+    "i18next": "^21.6.14",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^6.2.9",
+    "multer": "^1.4.4",
+    "multer-gridfs-storage": "^5.0.2",
+    "node-fetch": "^3.2.4",
+    "nodemailer": "^6.7.5",
+    "nodemailer-express-handlebars": "^5.0.0",
+    "stripe": "^8.222.0"
+  }
+}

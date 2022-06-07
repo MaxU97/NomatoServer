@@ -1,0 +1,10 @@
+<svg id="Down_Icon" data-name="Down Icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10" height="7" viewBox="0 0 10 7">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_2" data-name="Rectangle 2" width="10" height="7" transform="translate(1700.796 36)" fill="none" stroke="#707070" stroke-width="1"/>
+    </clipPath>
+  </defs>
+  <g id="Down_Icon-2" data-name="Down Icon" transform="translate(-1700.796 -36)" clip-path="url(#clip-path)">
+    <path id="iconmonstr-arrow-80" d="M4.9,6.125,0,.875H9.8Z" transform="translate(1701 36)" fill="#d4d4d4"/>
+  </g>
+</svg>

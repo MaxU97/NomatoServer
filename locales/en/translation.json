@@ -1,0 +1,15 @@
+{
+  "login": {
+    "invalid": "Invalid Details"
+  },
+  "qr": {
+    "invalid": "Invalid QR Code",
+    "pick-up": "Pick-up Confirmed",
+    "drop-off": "Drop-off Confirmed",
+    "booking-not-found": "Booking not found or doesn't need approval"
+  },
+  "error": "Something Went Wrong",
+  "prereg": {
+    "invalid-email": "Code Invalid"
+  }
+}

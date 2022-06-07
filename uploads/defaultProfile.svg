@@ -1,0 +1,10 @@
+<svg id="Profile_Icon" data-name="Profile Icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="50" height="50" viewBox="0 0 50 50">
+  <defs>
+    <clipPath id="clip-path">
+      <circle id="Ellipse_1" data-name="Ellipse 1" cx="25" cy="25" r="25" transform="translate(1831 15)" fill="#d4d4d4" stroke="#707070" stroke-width="1" opacity="0.5"/>
+    </clipPath>
+  </defs>
+  <g id="Mask_Group_1" data-name="Mask Group 1" transform="translate(-1831 -15)" clip-path="url(#clip-path)">
+    <path id="iconmonstr-user-20" d="M25,0A25,25,0,1,0,50,25,25,25,0,0,0,25,0ZM41.152,38.135c-.544-1.221-1.644-2.065-3.9-2.585-4.777-1.1-9.225-2.069-7.069-6.135,6.552-12.379,1.735-19-5.185-19-7.058,0-11.758,6.873-5.185,19,2.221,4.092-2.392,5.056-7.069,6.135-2.258.521-3.35,1.371-3.89,2.6a20.833,20.833,0,1,1,32.3-.01Z" transform="translate(1831 15)" fill="#d4d4d4"/>
+  </g>
+</svg>
