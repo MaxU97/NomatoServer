@@ -72,6 +72,7 @@ require("./app/routes/items.routes")(app, upload);
 require("./app/routes/categories.routes")(app, uploadIcon);
 require("./app/services/scheduler/taskScheduler")();
 app.get("/*", (req, res) => {
+  console.log("Gets here");
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 const PORT = process.env.PORT;
