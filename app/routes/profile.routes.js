@@ -1,6 +1,6 @@
 const controller = require("../controllers/profile.controllers");
 
-const { authJwt } = require("../middlewares");
+const { authJwt } = require("../middlewares").default;
 
 module.exports = function (app, upload) {
   app.use(function (req, res, next) {

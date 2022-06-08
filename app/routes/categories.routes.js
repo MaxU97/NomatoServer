@@ -1,4 +1,4 @@
-const { authJwt } = require("../middlewares");
+const { authJwt } = require("../middlewares").default;
 const controller = require("../controllers/categories.controller");
 
 module.exports = (app, uploadIcon) => {
