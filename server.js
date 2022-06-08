@@ -52,13 +52,10 @@ const uploadIcon = multer({ storage: iconStorage });
 const db = require("./app/models");
 
 db.mongoose
-  .connect(
-    `mongodb+srv://nomatodev.lghiyns.mongodb.net/?authSource=%24external&authMechanism=MONGODB-X509&retryWrites=true&w=majority`,
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
-  )
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => {
     console.log("Successfully connect to MongoDB.");
   })
