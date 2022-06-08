@@ -53,7 +53,7 @@ const db = require("./app/models");
 
 db.mongoose
   .connect(
-    `mongodb+srv://nomato_dev:cd2605bb4@nomatodev.lghiyns.mongodb.net/test`,
+    `mongodb+srv://nomatodev.lghiyns.mongodb.net/?authSource=%24external&authMechanism=MONGODB-X509&retryWrites=true&w=majority`,
     {
       useNewUrlParser: true,
       useUnifiedTopology: true,
