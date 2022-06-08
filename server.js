@@ -8,6 +8,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const path = require("path");
 const https = require("https");
+const http = require("http");
 
 var corsOptions = {
   origin: "https://localhost:3000",
@@ -71,13 +72,13 @@ require("./app/routes/news.routes")(app, upload);
 require("./app/routes/items.routes")(app, upload);
 require("./app/routes/categories.routes")(app, uploadIcon);
 require("./app/services/scheduler/taskScheduler")();
-app.get("/", (req, res) => {
+app.get("/*", (req, res) => {
   console.log("Gets here");
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 const PORT = process.env.PORT;
 console.log("yes");
-https
+http
   .createServer(
     {
       key: fs.readFileSync("./certification/cert.key"),
