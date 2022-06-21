@@ -11,5 +11,12 @@
   "error": "Something Went Wrong",
   "prereg": {
     "invalid-email": "Code Invalid"
+  },
+  "user-update": {
+    "phone-err": "Phone can only be updated once every 30 days",
+    "address-err": "Address can only be updated once every 30 days",
+    "update-success": "Update Successful",
+    "update-success2": "Please note:",
+    "image-success": "Profile Image Updated"
   }
 }

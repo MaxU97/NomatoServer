@@ -1,8 +1,13 @@
 const db = require("../models");
 const mongoose = require("mongoose");
 const Item = db.item;
+const Booking = db.booking;
 const { checkLanguages } = require("../middlewares/translate");
 const { getNaturalAddress } = require("../middlewares/geocoder");
+const {
+  parseAddressSpecific,
+  getNaturalFromLongLat,
+} = require("../utility/addressUtilities");
 exports.upload = (req, res) => {
   const translations = checkLanguages(
     req.body.descEN,
@@ -14,11 +19,15 @@ exports.upload = (req, res) => {
     images.push(image.filename);
   });
 
-  Promise.all(translations).then((result) => {
+  Promise.all(translations).then(async (result) => {
+    const address = {
+      type: "Point",
+      coordinates: [req.body.addressLng, req.body.addressLat],
+    };
     const item = new Item({
       title: req.body.title,
       images: images,
-      address: { lat: req.body.addressLat, lng: req.body.addressLng },
+      address: address,
       category: req.body.category,
       descEN: result[0], //English
       descLV: result[1], //Russian
@@ -26,20 +35,31 @@ exports.upload = (req, res) => {
       itemQty: req.body.itemQty,
       itemValue: req.body.itemValue,
       minRent: req.body.minRent,
-      rentPriceDay: req.body.minRent,
-      rentPriceWeek: req.body.minRent,
-      rentPriceMonth: req.body.minRent,
+      rentPriceDay: req.body.rentPriceDay,
+      rentPriceWeek: req.body.rentPriceWeek,
+      rentPriceMonth: req.body.rentPriceMonth,
       likes: 0,
       dislikes: 0,
       user: req.userId,
       reviews: [],
+      addressNatural: JSON.parse(req.body.addressNatural),
     });
+
+    var tags;
     if (req.body.subcat) {
       item.subcat = req.body.subcat;
+      await item.populate("category");
+      await item.populate("subcat");
+      tags = generateTags(item.title, result, item.category, item.subcat);
+    } else {
+      await item.populate("category");
+      tags = generateTags(item.title, result, item.category, []);
     }
+
+    item.tagCloud = tags;
     item.save();
     console.log(req.body);
-    res.status(200).send("OK");
+    res.status(200).send({ message: "Item has been listed" });
   });
 };
 
@@ -53,7 +73,10 @@ exports.get = (req, res) => {
       .populate("subcat")
       .exec((err, result) => {
         console.log(result);
-
+        Booking.find({
+          itemID: id,
+          status: { $in: ["approved", "with_customer"] },
+        }).exec;
         let subcat;
         if (result[0].subcat) {
           subcat = {
@@ -65,7 +88,10 @@ exports.get = (req, res) => {
         }
         const response = {
           item: {
-            address: result[0].address,
+            address: {
+              lng: result[0].address.coordinates[0],
+              lat: result[0].address.coordinates[1],
+            },
             title: result[0].title,
             images: result[0].images,
             category: {
@@ -112,7 +138,7 @@ exports.getPopular = (req, res) => {
       user: 1,
       likes: 1,
       reviews: 1,
-      address: 1,
+      addressNatural: 1,
       images: 1,
       rentPriceDay: 1,
     }
@@ -130,11 +156,133 @@ exports.getPopular = (req, res) => {
           username: r.user.name,
           likes: r.likes,
           ratingAmount: r.reviews.length,
-          location: "Riga",
+          location: parseAddressSpecific(r.addressNatural, "locality"),
           imageURL: r.images[0],
           rentPriceDay: r.rentPriceDay,
         });
       });
       res.status(200).send({ items: returnArray });
     });
+};
+
+exports.searchItems = (req, res) => {
+  var filter;
+  const findArray = req.body.terms
+    .toUpperCase()
+    .split(/[,!?. ]+/)
+    .filter((element) => element);
+
+  if (findArray.length > 0) {
+    filter = {
+      tagCloud: {
+        $in: findArray,
+      },
+    };
+  } else {
+    filter = {};
+  }
+
+  if (req.body.category) {
+    filter = {
+      ...filter,
+      category: mongoose.Types.ObjectId(req.body.category),
+    };
+  }
+
+  if (req.body.lat & req.body.lng) {
+    const geometry = {
+      type: "Point",
+      coordinates: [req.body.lng, req.body.lat],
+    };
+    filter = {
+      ...filter,
+      address: {
+        $nearSphere: {
+          $geometry: geometry,
+          $maxDistance: req.body.km ? req.body.km : 10000,
+        },
+      },
+    };
+  }
+
+  var priceFilter = {};
+
+  if (req.body.pricefrom) {
+    priceFilter = { $gte: req.body.pricefrom };
+  }
+
+  if (req.body.priceto) {
+    priceFilter = { ...priceFilter, $lte: req.body.priceto };
+  }
+
+  if (Object.keys(priceFilter).length > 0) {
+    filter = {
+      ...filter,
+      rentPriceDay: priceFilter,
+    };
+  }
+
+  Item.find(filter, {
+    title: 1,
+    user: 1,
+    likes: 1,
+    reviews: 1,
+    address: 1,
+    addressNatural: 1,
+    images: 1,
+    rentPriceDay: 1,
+  })
+    .populate("user")
+    .limit(16)
+    .skip(16 * req.body.page)
+    .exec((err, result) => {
+      Item.count().exec((err, count) => {
+        let returnArray = [];
+        result.forEach((r) => {
+          returnArray.push({
+            id: r._id,
+            title: r.title,
+            username: r.user.name,
+            likes: r.likes,
+            ratingAmount: r.reviews.length,
+            latLng: {
+              lng: r.address.coordinates[0],
+              lat: r.address.coordinates[1],
+            },
+            location: parseAddressSpecific(r.addressNatural, "locality"),
+            imageURL: r.images[0],
+            rentPriceDay: r.rentPriceDay,
+          });
+        });
+        if (result.length < 16) {
+          count = result.length;
+        }
+        res
+          .status(200)
+          .send({ searchItems: returnArray, searchItemCount: count });
+      });
+    });
+};
+
+const generateTags = (title, result, category, subcat) => {
+  tagCloud = [];
+
+  tagCloud = [...tagCloud, ...title.split(/[,!?. ]+/)];
+
+  tagCloud = [...tagCloud, ...category.titleRU.split(/[,!?. ]+/)];
+  tagCloud = [...tagCloud, ...category.titleLV.split(/[,!?. ]+/)];
+  tagCloud = [...tagCloud, ...category.titleEN.split(/[,!?. ]+/)];
+  tagCloud = [...tagCloud, ...subcat.titleRU.split(/[,!?. ]+/)];
+  tagCloud = [...tagCloud, ...subcat.titleLV.split(/[,!?. ]+/)];
+  tagCloud = [...tagCloud, ...subcat.titleEN.split(/[,!?. ]+/)];
+
+  result.map((res) => {
+    tagCloud = [...tagCloud, ...res.split(/[,!?. ]+/)];
+  });
+  tagCloud = tagCloud
+    .map((element) => {
+      return element.toUpperCase();
+    })
+    .filter((element) => element);
+  return tagCloud;
 };

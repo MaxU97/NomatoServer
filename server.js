@@ -8,7 +8,6 @@ const dotenv = require("dotenv");
 dotenv.config();
 const path = require("path");
 const https = require("https");
-const http = require("http");
 
 var corsOptions = {
   origin: "https://localhost:3000",
@@ -46,9 +45,22 @@ var iconStorage = multer.diskStorage({
   },
 });
 
+var profilePictureStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/ProfilePictures");
+  },
+  filename: function (req, file, cb) {
+    file_name = file.originalname;
+    file_name = file_name.replace(/\s+/g, "");
+    cb(null, req.userId + file_name + Date.now() + ".webp");
+  },
+});
+
 const upload = multer({ storage: storage });
 
 const uploadIcon = multer({ storage: iconStorage });
+
+const uploadProfilePicture = multer({ storage: profilePictureStorage });
 
 const db = require("./app/models");
 
@@ -65,7 +77,7 @@ db.mongoose
     process.exit();
   });
 
-require("./app/routes/auth.routes")(app);
+require("./app/routes/auth.routes")(app, uploadProfilePicture);
 require("./app/routes/booking.routes")(app);
 require("./app/routes/profile.routes")(app, upload);
 require("./app/routes/news.routes")(app, upload);
@@ -76,9 +88,9 @@ app.get("/*", (req, res) => {
   console.log("Gets here");
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 4000;
 console.log("yes");
-http
+https
   .createServer(
     {
       key: fs.readFileSync("./certification/cert.key"),

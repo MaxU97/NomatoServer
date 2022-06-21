@@ -2,7 +2,7 @@ const { verifySignUp } = require("../middlewares");
 const { authJwt } = require("../middlewares");
 const controller = require("../controllers/auth.controller");
 
-module.exports = function (app) {
+module.exports = function (app, uploadProfilePicture) {
   app.use(function (req, res, next) {
     res.header(
       "Access-Control-Allow-Headers",
@@ -39,5 +39,32 @@ module.exports = function (app) {
   );
   app.post("/api/auth/confirmPhone", controller.confirmPhone);
   app.post("/api/auth/login", controller.signin);
+  app.post("/api/auth/sendForgetEmail", controller.sendForgetEmail);
+  app.post(
+    "/api/auth/resendForgotPassword",
+    [verifySignUp.checkPreRegEmail],
+    controller.resendForgotPassword
+  );
+
+  app.post("/api/auth/sendForgotCode", controller.sendForgotCode);
+
+  app.post(
+    "/api/auth/sendResetPassword",
+    [verifySignUp.checkEmailConfirmed],
+    controller.sendResetPassword
+  );
+
   app.get("/api/auth/me", [authJwt.verifyToken], controller.getSelf);
+
+  app.patch(
+    "/api/auth/patchUser",
+    [authJwt.verifyToken],
+    controller.updateUser
+  );
+  app.patch(
+    "/api/auth/patchImage",
+    [authJwt.verifyToken],
+    uploadProfilePicture.single("image"),
+    controller.updateImage
+  );
 };

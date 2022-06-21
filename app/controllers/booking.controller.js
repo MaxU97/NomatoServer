@@ -28,34 +28,38 @@ exports.request = async (req, res) => {
         item
       );
       price = price + price * process.env.SERVICE_FEE + 25;
-    }
-  );
 
-  User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
-    async (err, user) => {
-      let paymentIntent;
-      if (req.body.paymentID != "new") {
-        paymentIntent = await stripe.paymentIntents.create({
-          amount: price,
-          currency: "eur",
-          customer: user.stripeID,
-          payment_method: req.body.paymentID,
-          capture_method: "manual",
-        });
-      } else {
-        paymentIntent = await stripe.paymentIntents.create({
-          customer: user.stripeID,
-          amount: price,
-          currency: "eur",
-          setup_future_usage: "on_session",
-          automatic_payment_methods: {
-            enabled: true,
-          },
-          capture_method: "manual",
-        });
-      }
+      User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
+        async (err, user) => {
+          let paymentIntent;
+          if (!user.completionStatus) {
+            res.status(400).send("You need to finish your profile");
+            return;
+          }
+          if (req.body.paymentID != "new") {
+            paymentIntent = await stripe.paymentIntents.create({
+              amount: price,
+              currency: "eur",
+              customer: user.stripeID,
+              payment_method: req.body.paymentID,
+              capture_method: "manual",
+            });
+          } else {
+            paymentIntent = await stripe.paymentIntents.create({
+              customer: user.stripeID,
+              amount: price,
+              currency: "eur",
+              setup_future_usage: "on_session",
+              automatic_payment_methods: {
+                enabled: true,
+              },
+              capture_method: "manual",
+            });
+          }
 
-      res.status(200).send({ clientSecret: paymentIntent.client_secret });
+          res.status(200).send({ clientSecret: paymentIntent.client_secret });
+        }
+      );
     }
   );
 };

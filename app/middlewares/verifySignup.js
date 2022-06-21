@@ -35,6 +35,31 @@ checkPreRegEmail = (req, res, next) => {
   });
 };
 
+checkEmailConfirmed = (req, res, next) => {
+  PreReg.findOneAndDelete({
+    email: req.body.email,
+  }).exec((err, prereg) => {
+    if (prereg) {
+      if (err) {
+        res.status(500).send({ message: err });
+        return;
+      }
+      if (prereg.confirmedEmail) {
+        res.locals.emailConfirmed = true;
+      } else {
+        res.locals.emailConfirmed = false;
+      }
+    } else {
+      res.status(401).send({
+        message: "Please restart password reset. Something went wrong",
+      });
+      return;
+    }
+
+    next();
+  });
+};
+
 checkDuplicatePhone = (req, res, next) => {
   User.findOne({
     phone: req.body.phone,
@@ -111,6 +136,7 @@ const verifySignUp = {
   checkPhoneTimeout,
   checkDuplicatePhone,
   checkPreRegEmail,
+  checkEmailConfirmed,
 };
 
 module.exports = verifySignUp;

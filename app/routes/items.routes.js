@@ -16,4 +16,5 @@ module.exports = function (app, upload) {
   );
   app.post("/api/item/get", controller.get);
   app.get("/api/item/getpopular", controller.getPopular);
+  app.post("/api/item/search", controller.searchItems);
 };

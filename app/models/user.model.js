@@ -6,6 +6,10 @@ const User = mongoose.model(
     surname: { type: String },
     email: { type: String, required: true },
     phone: { type: String, required: true },
+    phoneLastChanged: Date,
+    address: Array,
+    addressLatLng: Object,
+    addressLastChanged: Date,
     password: { type: String, required: true },
     admin: { type: Boolean, required: true, default: false },
     profileImage: {
@@ -17,6 +21,7 @@ const User = mongoose.model(
     stripeSetupID: { type: String, required: false },
     lastActive: Date,
     languages: { type: [String], default: ["EN", "RU", "LV"] },
+    completionStatus: { type: Boolean, default: false },
   })
 );
 
