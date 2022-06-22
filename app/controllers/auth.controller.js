@@ -373,6 +373,20 @@ exports.updateUser = (req, res) => {
       addressError && addressError,
     ];
 
+    var completed = true;
+    if (!user.name) {
+      completed = false;
+    }
+    if (!user.surname) {
+      completed = false;
+    }
+    if (!user.address) {
+      completed = false;
+    }
+    if (completed && !user.completionStatus) {
+      user.completionStatus = true;
+    }
+
     const address = parseAddressFull(user.address);
     response = {
       id: user._id,
@@ -388,6 +402,7 @@ exports.updateUser = (req, res) => {
       allowPhoneEdit: !(phoneDiff < 30),
       allowAddressEdit: !(addressDiff < 30),
       message: message,
+      completionStatus: user.completionStatus,
     };
     res.status(200).send(response);
   });
