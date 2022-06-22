@@ -8,6 +8,7 @@ const {
   parseAddressSpecific,
   getNaturalFromLongLat,
 } = require("../utility/addressUtilities");
+const { getDaysBetween } = require("../utility/datesUtilities");
 exports.upload = (req, res) => {
   const translations = checkLanguages(
     req.body.descEN,
@@ -73,56 +74,70 @@ exports.get = (req, res) => {
       .populate("subcat")
       .exec((err, result) => {
         console.log(result);
-        Booking.find({
-          itemID: id,
-          status: { $in: ["approved", "with_customer"] },
-        }).exec;
-        let subcat;
-        if (result[0].subcat) {
-          subcat = {
-            id: result[0].subcat._id,
-            titleRU: result[0].subcat.titleRU,
-            titleEN: result[0].subcat.titleEN,
-            titleLV: result[0].subcat.titleLV,
-          };
-        }
-        const response = {
-          item: {
-            address: {
-              lng: result[0].address.coordinates[0],
-              lat: result[0].address.coordinates[1],
-            },
-            title: result[0].title,
-            images: result[0].images,
-            category: {
-              id: result[0].category._id,
-              titleRU: result[0].category.titleRU,
-              titleEN: result[0].category.titleEN,
-              titleLV: result[0].category.titleLV,
-            },
-            subcat: subcat,
-            descEN: result[0].descEN,
-            descRU: result[0].descRU,
-            descLV: result[0].descLV,
-            itemQty: result[0].itemQty,
-            itemValue: result[0].itemValue,
-            minRent: result[0].minRent,
-            rentPriceDay: result[0].rentPriceDay,
-            rentPriceWeek: result[0].rentPriceWeek,
-            rentPriceMonth: result[0].rentPriceMonth,
-            likes: result[0].likes,
-            dislikes: result[0].dislikes,
-            reviews: result[0].reviews,
-            user: {
-              id: result[0].user._id,
-              name: result[0].user.name,
-              profileImage: result[0].user.profileImage,
-              lastActive: result[0].user.lastActive,
-            },
+        Booking.find(
+          {
+            itemID: id,
+            status: { $in: ["approved", "with_customer", "returned"] },
           },
-        };
+          { dateStart: 1, dateEnd: 1 }
+        ).exec((err, bookings) => {
+          let subcat;
 
-        res.status(200).send(response);
+          var bookedDates = [];
+          if (bookings.length > 0) {
+            bookings.forEach((booking) => {
+              const dates = getDaysBetween(booking.dateStart, booking.dateEnd);
+              bookedDates.push(...dates);
+            });
+          }
+
+          if (result[0].subcat) {
+            subcat = {
+              id: result[0].subcat._id,
+              titleRU: result[0].subcat.titleRU,
+              titleEN: result[0].subcat.titleEN,
+              titleLV: result[0].subcat.titleLV,
+            };
+          }
+          const response = {
+            item: {
+              address: {
+                lng: result[0].address.coordinates[0],
+                lat: result[0].address.coordinates[1],
+              },
+              title: result[0].title,
+              images: result[0].images,
+              category: {
+                id: result[0].category._id,
+                titleRU: result[0].category.titleRU,
+                titleEN: result[0].category.titleEN,
+                titleLV: result[0].category.titleLV,
+              },
+              subcat: subcat,
+              descEN: result[0].descEN,
+              descRU: result[0].descRU,
+              descLV: result[0].descLV,
+              itemQty: result[0].itemQty,
+              itemValue: result[0].itemValue,
+              minRent: result[0].minRent,
+              rentPriceDay: result[0].rentPriceDay,
+              rentPriceWeek: result[0].rentPriceWeek,
+              rentPriceMonth: result[0].rentPriceMonth,
+              likes: result[0].likes,
+              dislikes: result[0].dislikes,
+              reviews: result[0].reviews,
+              bookedDates: bookedDates,
+              user: {
+                id: result[0].user._id,
+                name: result[0].user.name,
+                profileImage: result[0].user.profileImage,
+                lastActive: result[0].user.lastActive,
+              },
+            },
+          };
+
+          res.status(200).send(response);
+        });
       })
       .catch((err) => {
         res.status(404).send(err);

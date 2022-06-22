@@ -13,6 +13,7 @@ const sendApprovalNotification = require("../services/scheduler/jobs/sendApprova
 const sendRefusalNotification = require("../services/scheduler/jobs/sendRefusalNotification");
 const sendRequestNotification = require("../services/scheduler/jobs/sendRequestNotification");
 const i18n = require("../../locales/i18n");
+const { getDaysBetween } = require("../utility/datesUtilities");
 exports.getServiceFee = (req, res) => {
   res.send({ serviceFee: process.env.SERVICE_FEE });
 };
@@ -21,45 +22,82 @@ exports.request = async (req, res) => {
   let price;
   Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemID) }).exec(
     (err, item) => {
-      price = getPrice(
-        req.body.dateEnd,
-        req.body.dateStart,
-        req.body.qtyWant,
-        item
-      );
-      price = price + price * process.env.SERVICE_FEE + 25;
-
-      User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
-        async (err, user) => {
-          let paymentIntent;
-          if (!user.completionStatus) {
-            res.status(400).send("You need to finish your profile");
-            return;
-          }
-          if (req.body.paymentID != "new") {
-            paymentIntent = await stripe.paymentIntents.create({
-              amount: price,
-              currency: "eur",
-              customer: user.stripeID,
-              payment_method: req.body.paymentID,
-              capture_method: "manual",
-            });
-          } else {
-            paymentIntent = await stripe.paymentIntents.create({
-              customer: user.stripeID,
-              amount: price,
-              currency: "eur",
-              setup_future_usage: "on_session",
-              automatic_payment_methods: {
-                enabled: true,
-              },
-              capture_method: "manual",
-            });
-          }
-
-          res.status(200).send({ clientSecret: paymentIntent.client_secret });
+      Booking.find(
+        {
+          _id: mongoose.Types.ObjectId(req.body.itemID),
+          status: { $in: ["approved", "with_customer", "returned"] },
+        },
+        { dateStart: 1, dateEnd: 1 }
+      ).exec((err, bookings) => {
+        var bookedDates = [];
+        if (bookings.length > 0) {
+          bookings.forEach((booking) => {
+            const dates = getDaysBetween(booking.dateStart, booking.dateEnd);
+            bookedDates.push(...dates);
+          });
         }
-      );
+
+        var submittedDays = getDaysBetween(
+          req.body.dateStart,
+          req.body.dateEnd
+        );
+
+        const allowBooking = submittedDays.every((element) => {
+          if (bookedDates.includes(element)) {
+            return false;
+          } else {
+            return true;
+          }
+        });
+        if (allowBooking) {
+          price = getPrice(
+            req.body.dateEnd,
+            req.body.dateStart,
+            req.body.qtyWant,
+            item
+          );
+          price = price + price * process.env.SERVICE_FEE + 25;
+
+          User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
+            async (err, user) => {
+              let paymentIntent;
+              if (!user.completionStatus) {
+                res.status(400).send("You need to finish your profile");
+                return;
+              }
+              if (req.body.paymentID != "new") {
+                paymentIntent = await stripe.paymentIntents.create({
+                  amount: price,
+                  currency: "eur",
+                  customer: user.stripeID,
+                  payment_method: req.body.paymentID,
+                  capture_method: "manual",
+                });
+              } else {
+                paymentIntent = await stripe.paymentIntents.create({
+                  customer: user.stripeID,
+                  amount: price,
+                  currency: "eur",
+                  setup_future_usage: "on_session",
+                  automatic_payment_methods: {
+                    enabled: true,
+                  },
+                  capture_method: "manual",
+                });
+              }
+
+              res
+                .status(200)
+                .send({ clientSecret: paymentIntent.client_secret });
+            }
+          );
+        } else {
+          res.status(401).send({
+            message:
+              "You are not allowed to book dates that are already booked",
+          });
+        }
+      });
     }
   );
 };
