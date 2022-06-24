@@ -521,6 +521,7 @@ exports.getSelf = (req, res) => {
       status: { $nin: ["deleted"] },
     },
     {
+      _id: 1,
       status: 1,
       title: 1,
       images: 1,
@@ -539,8 +540,9 @@ exports.getSelf = (req, res) => {
     var returnArray = [];
     items.forEach((item) => {
       returnArray.push({
+        id: item._id,
         status: item.status,
-        title: item.status,
+        title: item.title,
         image: item.images[0],
       });
     });
