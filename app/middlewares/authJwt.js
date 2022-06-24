@@ -64,13 +64,54 @@ appendUser = (req, res, next) => {
     next();
   });
 };
-isCompletedAccount = () => {};
 
+isCompletedAccount = (req, res, next) => {
+  if (req.userId != null) {
+    User.findById(req.userId).exec((err, user) => {
+      if (err) {
+        res.status(500).send({ message: err });
+        return;
+      }
+      if (user.completionStatus) {
+        next();
+      } else {
+        res.status(403).send({ message: "Your profile is not complete" });
+        return;
+      }
+    });
+  } else {
+    next();
+  }
+};
+
+verifyPassword = (req, res, next) => {
+  if (req.userId != null) {
+    User.findById(req.userId).exec((err, user) => {
+      if (err) {
+        res.status(500).send({ message: err });
+        return;
+      }
+      var passwordIsValid = bcrypt.compareSync(
+        req.body.oldPassword,
+        user.password
+      );
+      if (passwordIsValid) {
+        next();
+      } else {
+        res.status(401).send({ message: "The entered password is wrong" });
+      }
+    });
+  } else {
+    res.status(401).send({ message: "Not Authorised" });
+  }
+};
 const authJwt = {
   verifyToken,
+  verifyPassword,
   isAdmin,
   appendAdmin,
   appendUser,
+  isCompletedAccount,
 };
 
 module.exports = authJwt;

@@ -515,6 +515,20 @@ exports.sendResetPassword = (req, res) => {
   }
 };
 
+exports.sendChangePassword = (req, res) => {
+  User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
+    (err, user) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      user.password = bcrypt.hashSync(req.body.password, 8);
+      user.save();
+      res.status(200).send({ message: "Password Changed!" });
+    }
+  );
+};
+
 const renewUser = (user, res) => {
   user.lastActive = Date.now();
   user.save((err) => {

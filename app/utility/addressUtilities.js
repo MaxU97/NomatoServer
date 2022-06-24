@@ -1,14 +1,5 @@
 exports.parseAddressFull = (address) => {
-  var addressString = "";
-
-  address.map((entry, index) => {
-    if (address[index + 1] !== undefined) {
-      addressString = addressString + entry.long_name + ", ";
-    } else {
-      addressString = addressString + entry.long_name;
-    }
-  });
-  return addressString;
+  return address[0].formatted_address;
 };
 
 exports.parseAddressSpecific = (address, type) => {

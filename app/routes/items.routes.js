@@ -10,7 +10,7 @@ module.exports = function (app, upload) {
   });
   app.post(
     "/api/item/upload",
-    [authJwt.verifyToken],
+    [authJwt.verifyToken, authJwt.isCompletedAccount],
     upload.array("images", 5),
     controller.upload
   );

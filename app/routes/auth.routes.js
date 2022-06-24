@@ -67,4 +67,10 @@ module.exports = function (app, uploadProfilePicture) {
     uploadProfilePicture.single("image"),
     controller.updateImage
   );
+
+  app.patch(
+    "/api/auth/sendChangePassword",
+    [authJwt.verifyToken, authJwt.verifyPassword],
+    controller.sendResetPassword
+  );
 };
