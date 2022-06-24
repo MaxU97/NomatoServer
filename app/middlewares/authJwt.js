@@ -34,11 +34,43 @@ isAdmin = (req, res, next) => {
   });
 };
 
+appendAdmin = (req, res, next) => {
+  if (req.userId != null) {
+    User.findById(req.userId).exec((err, user) => {
+      if (err) {
+        res.status(500).send({ message: err });
+        return;
+      }
+      req.isAdmin = user.admin;
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
+appendUser = (req, res, next) => {
+  let token = req.headers["x-access-token"];
+  if (token == null) {
+    req.userId = null;
+    next();
+    return;
+  }
+  jwt.verify(token, config.secret, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "Unauthorized!" });
+    }
+    req.userId = decoded.id;
+    next();
+  });
+};
 isCompletedAccount = () => {};
 
 const authJwt = {
   verifyToken,
   isAdmin,
+  appendAdmin,
+  appendUser,
 };
 
 module.exports = authJwt;

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const Schema = new mongoose.Schema({
+  status: { default: "exists", type: String },
   title: { type: String, required: true },
   images: [{ type: String, required: true }],
   address: {
