@@ -20,8 +20,9 @@ exports.getServiceFee = (req, res) => {
 
 exports.request = async (req, res) => {
   let price;
-  Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemID) }).exec(
-    (err, item) => {
+  Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemID) })
+    .populate("user")
+    .exec((err, item) => {
       Booking.find(
         {
           _id: mongoose.Types.ObjectId(req.body.itemID),
@@ -56,7 +57,8 @@ exports.request = async (req, res) => {
             req.body.qtyWant,
             item
           );
-          price = price + price * process.env.SERVICE_FEE + 25;
+          var fee = price * process.env.SERVICE_FEE;
+          price = price + fee;
 
           User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
             async (err, user) => {
@@ -72,6 +74,8 @@ exports.request = async (req, res) => {
                   customer: user.stripeID,
                   payment_method: req.body.paymentID,
                   capture_method: "manual",
+                  application_fee_amount: fee,
+                  transfer_data: { destination: item.user.sellerID },
                 });
               } else {
                 paymentIntent = await stripe.paymentIntents.create({
@@ -83,6 +87,8 @@ exports.request = async (req, res) => {
                     enabled: true,
                   },
                   capture_method: "manual",
+                  application_fee_amount: fee,
+                  transfer_data: { destination: item.user.sellerID },
                 });
               }
 
@@ -98,8 +104,7 @@ exports.request = async (req, res) => {
           });
         }
       });
-    }
-  );
+    });
 };
 
 exports.getPaymentMethods = (req, res) => {
@@ -406,12 +411,12 @@ exports.approveBooking = (req, res) => {
         res.status(404).send({ error: "Something Went Wrong" });
         return;
       }
-      booking.status = "approved";
-      booking.save();
       try {
         const paymentIntent = await stripe.paymentIntents.capture(
           booking.intentID
         );
+        booking.status = "approved";
+        booking.save();
       } catch (err) {
         res.status(404).send({ error: "Something Went Wrong" });
         return;
@@ -446,28 +451,32 @@ exports.getApprovedUser = (req, res) => {
 
 exports.scanQR = (req, res) => {
   const t = i18n(req.headers["accept-language"]);
-
   const options = req.body;
   let ownerID;
   let userID;
   let statusArray;
   let newStatus;
   let message;
-  switch (options.type) {
-    case "pickup":
-      statusArray = ["approved"];
-      newStatus = "with_customer";
-      message = t("qr.pick-up");
-      ownerID = mongoose.Types.ObjectId(req.userId);
-      userID = mongoose.Types.ObjectId(options.userID);
-      break;
-    case "dropoff":
-      ownerID = mongoose.Types.ObjectId(options.userID);
-      userID = mongoose.Types.ObjectId(req.userId);
-      statusArray = ["with_customer"];
-      newStatus = "returned";
-      message = t("qr.drop-off");
-      break;
+  if (options.type) {
+    switch (options.type) {
+      case "pickup":
+        statusArray = ["approved"];
+        newStatus = "with_customer";
+        message = t("qr.pick-up");
+        ownerID = mongoose.Types.ObjectId(req.userId);
+        userID = mongoose.Types.ObjectId(options.userID);
+        break;
+      case "dropoff":
+        ownerID = mongoose.Types.ObjectId(options.userID);
+        userID = mongoose.Types.ObjectId(req.userId);
+        statusArray = ["with_customer"];
+        newStatus = "returned";
+        message = t("qr.drop-off");
+        break;
+      default:
+    }
+  } else {
+    res.status(403).send({ message: "Wrong type submitted" });
   }
 
   Booking.findOne({

@@ -19,6 +19,17 @@ exports.signup = async (req, res) => {
   PreReg.findOneAndDelete({
     _id: mongoose.Types.ObjectId(req.body._id),
   }).exec(async (err, prereg) => {
+    const account = await stripe.accounts.create({
+      type: "express",
+      email: prereg.email,
+      settings: {
+        payouts: {
+          schedule: {
+            interval: "daily",
+          },
+        },
+      },
+    });
     const customer = await stripe.customers.create({
       email: prereg.email,
       phone: prereg.phone,
@@ -30,6 +41,7 @@ exports.signup = async (req, res) => {
       password: prereg.password,
       lastActive: Date.now(),
       stripeID: customer.id,
+      sellerID: account.id,
       languages: prereg.languages,
     });
     user.save((err) => {
@@ -272,10 +284,13 @@ exports.getSelf = (req, res) => {
       Date.now(),
       user.phoneLastChanged
     );
-    const addressDiff = differenceInCalendarDays(
+    var addressDiff = differenceInCalendarDays(
       Date.now(),
       user.addressLastChanged
     );
+    if (addressDiff === "NaN") {
+      addressDiff = 999;
+    }
 
     var completed = true;
     if (!user.name) {
@@ -292,8 +307,10 @@ exports.getSelf = (req, res) => {
     }
 
     renewUser(user, res);
-
-    const address = parseAddressFull(user.address);
+    var address = "";
+    if (user.address.length > 0) {
+      address = parseAddressFull(user.address);
+    }
 
     res.status(200).send({
       id: user._id,
@@ -309,6 +326,7 @@ exports.getSelf = (req, res) => {
       allowPhoneEdit: !(phoneDiff < 30),
       allowAddressEdit: !(addressDiff < 30),
       completionStatus: user.completionStatus,
+      sellerCompleted: user.sellerCompleted,
     });
   });
 };
@@ -527,6 +545,109 @@ exports.sendChangePassword = (req, res) => {
       res.status(200).send({ message: "Password Changed!" });
     }
   );
+};
+
+exports.registerLender = (req, res) => {
+  User.findOne(
+    { _id: req.userId, sellerCompleted: false },
+    { sellerID: 1 }
+  ).exec(async (err, user) => {
+    if (err) {
+      res.status(500).send({ message: "Something went wrong" });
+      return;
+    }
+    if (!user) {
+      res.status(404).send({
+        message:
+          "User not found or account already registered. If you want to change the details, go to your profile",
+      });
+      return;
+    }
+
+    try {
+      const accountLink = await stripe.accountLinks.create({
+        account: user.sellerID,
+        refresh_url: `${process.env.WEBSITE_URL}become-a-lender`,
+        return_url: `${process.env.WEBSITE_URL}become-a-lender`,
+        type: "account_onboarding",
+      });
+      res.status(200).send({ url: accountLink.url });
+    } catch (err) {
+      res
+        .status(500)
+        .send({ message: "Something went wrong, please try again later" });
+      return;
+    }
+  });
+};
+
+exports.checkStripeCompletion = (req, res) => {
+  User.findOne({ _id: req.userId }).exec(async (err, user) => {
+    if (err) {
+      res.status(500).send({ message: "Something went wrong" });
+      return;
+    }
+    if (!user) {
+      res.status(404).send({ message: "User not found" });
+      return;
+    }
+    var address = "";
+    if (user.address.length > 0) {
+      address = parseAddressFull(user.address);
+    }
+
+    if (!user.sellerCompleted) {
+      const account = await stripe.accounts.retrieve(user.sellerID);
+      if (account.details_submitted) {
+        user.sellerCompleted = true;
+        user.save();
+      }
+    }
+    res.status(200).send({
+      id: user._id,
+      name: user.name,
+      surname: user.surname,
+      address: address,
+      phone: user.phone,
+      email: user.email,
+      admin: user.admin,
+      profileImage: user.profileImage,
+      lastActive: user.lastActive,
+      languages: user.languages,
+      allowPhoneEdit: user.allowPhoneEdit,
+      allowAddressEdit: user.allowAddressEdit,
+      completionStatus: user.completionStatus,
+      sellerCompleted: user.sellerCompleted,
+    });
+  });
+};
+
+exports.userBalance = (req, res) => {
+  User.findOne(
+    { _id: mongoose.Types.ObjectId(req.userId) },
+    { sellerID: 1 }
+  ).exec(async (err, user) => {
+    if (err) {
+      res.status(500).send({ message: "Something went wrong" });
+      return;
+    }
+    if (!user) {
+      res.status(404).send({ message: "User not found" });
+      return;
+    }
+    try {
+      const balance = await stripe.balance.retrieve({
+        stripeAccount: user.sellerID,
+      });
+      res.status(200).send({
+        pending: balance.pending[0].amount,
+        available: balance.available[0].amount,
+      });
+    } catch (err) {
+      res.status(500).send({ message: "Something went wrong" });
+      return;
+    }
+  });
 };
 
 const renewUser = (user, res) => {

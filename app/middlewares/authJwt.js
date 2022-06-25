@@ -3,7 +3,7 @@ const config = require("../config/auth.config.js");
 const db = require("../models");
 const User = db.user;
 const Role = db.role;
-
+var bcrypt = require("bcryptjs");
 verifyToken = (req, res, next) => {
   let token = req.headers["x-access-token"];
   if (!token) {
@@ -51,7 +51,7 @@ appendAdmin = (req, res, next) => {
 
 appendUser = (req, res, next) => {
   let token = req.headers["x-access-token"];
-  if (token == null) {
+  if (token == "null" || token == null) {
     req.userId = null;
     next();
     return;
@@ -84,6 +84,27 @@ isCompletedAccount = (req, res, next) => {
   }
 };
 
+isSeller = (req, res, next) => {
+  if (req.userId != null) {
+    User.findById(req.userId).exec((err, user) => {
+      if (err) {
+        res.status(500).send({ message: err });
+        return;
+      }
+      if (user.sellerCompleted) {
+        next();
+      } else {
+        res
+          .status(403)
+          .send({ message: "You have not set up your account with stripe" });
+        return;
+      }
+    });
+  } else {
+    next();
+  }
+};
+
 verifyPassword = (req, res, next) => {
   if (req.userId != null) {
     User.findById(req.userId).exec((err, user) => {
@@ -91,14 +112,31 @@ verifyPassword = (req, res, next) => {
         res.status(500).send({ message: err });
         return;
       }
-      var passwordIsValid = bcrypt.compareSync(
-        req.body.oldPassword,
-        user.password
-      );
+      var passwordIsValid;
+      if (req.body.oldPassword) {
+        passwordIsValid = bcrypt.compareSync(
+          req.body.oldPassword,
+          user.password
+        );
+      } else {
+        res.status(401).send({ message: "You must enter the old password" });
+        return;
+      }
+
       if (passwordIsValid) {
+        if (req.body.password) {
+          samePassword = bcrypt.compareSync(req.body.password, user.password);
+        }
+
+        if (samePassword) {
+          res.status(401).send({
+            message: "The new password must be different to the old password",
+          });
+          return;
+        }
         next();
       } else {
-        res.status(401).send({ message: "The entered password is wrong" });
+        res.status(401).send({ message: "The old password is wrong" });
       }
     });
   } else {
@@ -112,6 +150,7 @@ const authJwt = {
   appendAdmin,
   appendUser,
   isCompletedAccount,
+  isSeller,
 };
 
 module.exports = authJwt;

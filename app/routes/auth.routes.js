@@ -71,6 +71,23 @@ module.exports = function (app, uploadProfilePicture) {
   app.patch(
     "/api/auth/sendChangePassword",
     [authJwt.verifyToken, authJwt.verifyPassword],
-    controller.sendResetPassword
+    controller.sendChangePassword
+  );
+
+  app.get(
+    "/api/auth/requestAccount",
+    [authJwt.verifyToken, authJwt.isCompletedAccount],
+    controller.registerLender
+  );
+  app.get(
+    "/api/auth/checkStripeCompletion",
+    [authJwt.verifyToken],
+    controller.checkStripeCompletion
+  );
+
+  app.get(
+    "/api/auth/userBalance",
+    [authJwt.verifyToken, authJwt.isSeller],
+    controller.userBalance
   );
 };
