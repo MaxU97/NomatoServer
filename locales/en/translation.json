@@ -18,5 +18,7 @@
     "update-success": "Update Successful",
     "update-success2": "Please note:",
     "image-success": "Profile Image Updated"
-  }
+  },
+
+  "phone-message": "Here is your activation code for your new profile:"
 }

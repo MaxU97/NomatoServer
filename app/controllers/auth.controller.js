@@ -15,6 +15,8 @@ const {
 } = require("../utility/addressUtilities");
 const sendForgotPasswordEmail = require("../services/scheduler/jobs/sendForgotPasswordEmail");
 
+const _ = require("lodash");
+
 exports.signup = async (req, res) => {
   PreReg.findOneAndDelete({
     _id: mongoose.Types.ObjectId(req.body._id),
@@ -25,7 +27,7 @@ exports.signup = async (req, res) => {
       settings: {
         payouts: {
           schedule: {
-            interval: "daily",
+            interval: "manual",
           },
         },
       },
@@ -155,8 +157,14 @@ exports.preRegPhone = (req, res) => {
           res.status(500).send({ message: err });
           return;
         } else {
-          res.send({ phone: prereg.phone });
-          await sendPhoneConfirmation(req.body.phone, number);
+          try {
+            await sendPhoneConfirmation(req, number);
+            res.send({ phone: prereg.phone });
+          } catch (err) {
+            res
+              .status(500)
+              .sendMessage("Something went wrong, please try again");
+          }
         }
       });
     } else {
@@ -167,24 +175,26 @@ exports.preRegPhone = (req, res) => {
   });
 };
 
-const sendPhoneConfirmation = async (phone, number) => {
-  //http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
-  // const axios = require("axios");
-  // const props = {
-  //   "api-key": "606379fe95",
-  //   number: "37122330352",
-  //   sender: "GoStation",
-  //   text: number.toString(),
-  // };
-  // const url = `https://api1.esteria.lv/send?api-key=${"606379fe95"}&sender=${"GoStation"}&number=${"37122330352"}&text=${number}`;
-  // axios
-  //   .get(url)
-  //   .then((res) => {
-  //     console.log(res);
-  //   })
-  //   .catch((error) => {
-  //     console.error(error);
-  //   });
+const sendPhoneConfirmation = async (req, code) => {
+  // http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
+  var axios = require("axios");
+  const t = i18n(req.headers["accept-language"]);
+  const text = t("phone-message") + " " + code;
+  const sender = "NomaTo";
+  const api = process.env.SMS_API;
+  const number = req.body.phone;
+  const url = `https://api1.esteria.lv/send?api-key=${api}&sender=${sender}&number=${number}&text=${text}`;
+  axios
+    .get(url)
+    .then((res) => {
+      console.log(res);
+      if (res.data < 100) {
+        throw "Something went wrong";
+      }
+    })
+    .catch((error) => {
+      throw error;
+    });
 };
 
 exports.confirmEmail = (req, res) => {
@@ -255,7 +265,7 @@ exports.resendPhoneCode = (req, res) => {
           prereg.phoneConfirmNumber = number;
           prereg.resentPhoneDate = Date.now();
           prereg.save();
-          await sendPhoneConfirmation(req.body.phone, number);
+          await sendPhoneConfirmation(req, number);
           res.status(200).send({ message: "Resent!" });
         }
       }
@@ -375,15 +385,18 @@ exports.updateUser = (req, res) => {
         await stripe.customers.update(user.stripeID, { phone: user.phone });
       }
     }
-    if (user.address != req.body.address) {
-      if (addressDiff < 30) {
-        addressError = t("user-update.address-err");
-      } else {
-        user.address = req.body.address;
-        user.addressLatLng = req.body.latlng;
-        user.addressLastChanged = Date.now();
+    if (req.body.latlng) {
+      if (!_.isEqual(user.address[0], req.body.address)) {
+        if (addressDiff < 30) {
+          addressError = t("user-update.address-err");
+        } else {
+          user.address = req.body.address;
+          user.addressLatLng = req.body.latlng;
+          user.addressLastChanged = Date.now();
+        }
       }
     }
+
     user.save();
     const message = [
       t("user-update.update-success"),

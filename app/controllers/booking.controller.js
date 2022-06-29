@@ -25,7 +25,7 @@ exports.request = async (req, res) => {
     .exec((err, item) => {
       Booking.find(
         {
-          _id: mongoose.Types.ObjectId(req.body.itemID),
+          itemID: mongoose.Types.ObjectId(req.body.itemID),
           status: { $in: ["approved", "with_customer", "returned"] },
         },
         { dateStart: 1, dateEnd: 1 }
@@ -74,8 +74,8 @@ exports.request = async (req, res) => {
                   customer: user.stripeID,
                   payment_method: req.body.paymentID,
                   capture_method: "manual",
-                  application_fee_amount: fee,
-                  transfer_data: { destination: item.user.sellerID },
+                  // application_fee_amount: fee,
+                  // transfer_data: { destination: item.user.sellerID },
                 });
               } else {
                 paymentIntent = await stripe.paymentIntents.create({
@@ -87,8 +87,8 @@ exports.request = async (req, res) => {
                     enabled: true,
                   },
                   capture_method: "manual",
-                  application_fee_amount: fee,
-                  transfer_data: { destination: item.user.sellerID },
+                  // application_fee_amount: fee,
+                  // transfer_data: { destination: item.user.sellerID },
                 });
               }
 
@@ -193,11 +193,11 @@ exports.sendBookingToOwner = (req, res) => {
 
       await sendRequestNotification(booking);
 
+      const paymentIntent = await stripe.paymentIntents.update(
+        req.body.intentID,
+        { transfer_group: booking.id }
+      );
       if (booking.saveCard === "false") {
-        const paymentIntent = await stripe.paymentIntents.retrieve(
-          req.body.intentID
-        );
-
         await stripe.paymentMethods.detach(paymentIntent.payment_method);
         booking.saveCard === "deleted";
       }
@@ -286,6 +286,7 @@ exports.cancelBooking = (req, res) => {
     status: { $nin: ["with_customer", "canceled", "refused", "returned"] },
   })
     .populate("itemID")
+    .populate("ownerID")
     .exec((err, booking) => {
       if (err) {
         res.status(404).send({ error: "Something Went Wrong" });
@@ -331,6 +332,12 @@ const cancelApprovedBooking = async (req, res, booking) => {
   );
 
   if (24 < hoursUntilBooking && hoursUntilBooking < 48) {
+    await stripe.transfers.create({
+      amount: price / 2,
+      currency: "eur",
+      destination: booking.ownerID.sellerID,
+      source_transaction: booking.chargeID,
+    });
     await stripe.refunds.create({
       payment_intent: booking.intentID,
       amount: price / 2,
@@ -339,6 +346,12 @@ const cancelApprovedBooking = async (req, res, booking) => {
     booking.save();
     res.status(200).send({ message: "Booking Cancelled, half refunded" });
   } else if (hoursUntilBooking < 24) {
+    await stripe.transfers.create({
+      amount: price,
+      currency: "eur",
+      destination: booking.ownerID.sellerID,
+      source_transaction: booking.chargeID,
+    });
     booking.status = "canceled";
     booking.save();
     res.status(200).send({ message: "Booking Cancelled, nothing refunded" });
@@ -346,6 +359,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
     await stripe.refunds.create({
       payment_intent: booking.intentID,
       amount: price,
+      reason: "requested_by_customer",
     });
     booking.status = "canceled";
     booking.save();
@@ -354,16 +368,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
 };
 
 const cancelOtherBooking = async (req, res, booking) => {
-  const price = getPrice(
-    booking.dateEnd,
-    booking.dateStart,
-    booking.qtyWant,
-    booking.itemID
-  );
-  await stripe.refunds.create({
-    payment_intent: booking.intentID,
-    amount: price,
-  });
+  const paymentIntent = await stripe.paymentIntents.cancel(booking.intentID);
   booking.status = "canceled";
   booking.save();
   res.status(200).send({ message: "Booking Canceled" });
@@ -415,6 +420,8 @@ exports.approveBooking = (req, res) => {
         const paymentIntent = await stripe.paymentIntents.capture(
           booking.intentID
         );
+
+        booking.chargeID = paymentIntent.charges.data[0].id;
         booking.status = "approved";
         booking.save();
       } catch (err) {
@@ -484,21 +491,38 @@ exports.scanQR = (req, res) => {
     userID: userID,
     _id: mongoose.Types.ObjectId(options.booking),
     status: { $in: statusArray },
-  }).exec((err, booking) => {
-    if (!booking) {
-      res
-        .status(404)
-        .send({ status: false, message: t("qr.booking-not-found") });
-      return;
-    }
-    if (err) {
-      res.status(500).send({ status: false, message: t("error") });
-      return;
-    }
-    booking.status = newStatus;
-    booking.save();
-    res.send({ status: true, message: message });
-  });
+  })
+    .populate("ownerID")
+    .populate("itemID")
+    .exec(async (err, booking) => {
+      if (!booking) {
+        res
+          .status(404)
+          .send({ status: false, message: t("qr.booking-not-found") });
+        return;
+      }
+      if (err) {
+        res.status(500).send({ status: false, message: t("error") });
+        return;
+      }
+      if (newStatus == "with_customer") {
+        const price = getPrice(
+          booking.dateEnd,
+          booking.dateStart,
+          booking.qtyWant,
+          booking.itemID
+        );
+        const transfer = await stripe.transfers.create({
+          amount: price,
+          currency: "eur",
+          destination: booking.ownerID.sellerID,
+          source_transaction: booking.chargeID,
+        });
+      }
+      booking.status = newStatus;
+      booking.save();
+      res.send({ status: true, message: message });
+    });
 };
 
 const getPrice = (dateEnd, dateStart, qtyWant, item) => {
