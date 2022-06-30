@@ -83,6 +83,7 @@ require("./app/routes/profile.routes")(app, upload);
 require("./app/routes/news.routes")(app, upload);
 require("./app/routes/items.routes")(app, upload);
 require("./app/routes/categories.routes")(app, uploadIcon);
+require("./app/routes/finance.routes")(app);
 require("./app/services/scheduler/taskScheduler")();
 app.get("/*", (req, res) => {
   console.log("Gets here");

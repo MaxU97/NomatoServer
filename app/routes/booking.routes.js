@@ -63,4 +63,6 @@ module.exports = function (app) {
   app.get("/api/booking/getServiceFee", controller.getServiceFee);
 
   app.post("/api/booking/scanQR", [authJwt.verifyToken], controller.scanQR);
+
+  app.post("/api/booking/getQrHash", [authJwt.verifyToken], controller.qrHash);
 };

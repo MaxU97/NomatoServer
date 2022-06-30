@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const Booking = db.booking;
 const User = db.user;
 const Item = db.item;
-
+const crypto = require("crypto");
 const stripe = require("stripe")(process.env.STRIPE_KEY);
 var differenceInCalendarDays = require("date-fns/differenceInCalendarDays");
 var differenceInHours = require("date-fns/differenceInHours");
@@ -14,6 +14,7 @@ const sendRefusalNotification = require("../services/scheduler/jobs/sendRefusalN
 const sendRequestNotification = require("../services/scheduler/jobs/sendRequestNotification");
 const i18n = require("../../locales/i18n");
 const { getDaysBetween } = require("../utility/datesUtilities");
+const { secret_key, iv } = require("../config/auth.config");
 exports.getServiceFee = (req, res) => {
   res.send({ serviceFee: process.env.SERVICE_FEE });
 };
@@ -456,9 +457,90 @@ exports.getApprovedUser = (req, res) => {
     });
 };
 
+exports.qrHash = (req, res) => {
+  var filter = {};
+  if (req.body.type) {
+    switch (req.body.type) {
+      case "pickup":
+        filter = {
+          userID: mongoose.Types.ObjectId(req.userId),
+          _id: mongoose.Types.ObjectId(req.body.booking),
+          status: { $in: ["approved"] },
+        };
+        break;
+      case "dropoff":
+        filter = {
+          ownerID: mongoose.Types.ObjectId(req.userId),
+          _id: mongoose.Types.ObjectId(req.body.booking),
+          status: { $in: ["with_customer"] },
+        };
+        break;
+    }
+  } else {
+    res.status(403).send({ message: "Wrong type submitted" });
+    return;
+  }
+
+  Booking.findOne(filter).exec((err, booking) => {
+    if (!booking) {
+      res
+        .status(404)
+        .send({ status: false, message: t("qr.booking-not-found") });
+      return;
+    }
+    if (err) {
+      res.status(500).send({ status: false, message: t("error") });
+      return;
+    }
+
+    var stringToHash;
+    if (req.body.type === "pickup") {
+      stringToHash = {
+        type: req.body.type,
+        booking: booking.id,
+        userID: booking.userID,
+      };
+    } else if (req.body.type === "dropoff") {
+      stringToHash = {
+        type: req.body.type,
+        booking: booking.id,
+        userID: booking.ownerID,
+      };
+    }
+
+    const newHash = encrypt(JSON.stringify(stringToHash));
+    res.status(200).send(newHash);
+    return;
+  });
+};
+
+const encrypt = (text) => {
+  let cipher = crypto.createCipheriv(
+    "aes-256-cbc",
+    Buffer.from(secret_key, "base64").slice(0, 32),
+    Buffer.from(iv, "base64").slice(0, 16)
+  );
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return { encryptedData: encrypted.toString("hex") };
+};
+
+// Decrypting text
+const decrypt = (text) => {
+  let encryptedText = Buffer.from(text, "hex");
+  let decipher = crypto.createDecipheriv(
+    "aes-256-cbc",
+    Buffer.from(secret_key, "base64").slice(0, 32),
+    Buffer.from(iv, "base64").slice(0, 16)
+  );
+  let decrypted = decipher.update(encryptedText);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+};
+
 exports.scanQR = (req, res) => {
   const t = i18n(req.headers["accept-language"]);
-  const options = req.body;
+  const options = JSON.parse(decrypt(req.body.encryptedData));
   let ownerID;
   let userID;
   let statusArray;
@@ -480,10 +562,10 @@ exports.scanQR = (req, res) => {
         newStatus = "returned";
         message = t("qr.drop-off");
         break;
-      default:
     }
   } else {
     res.status(403).send({ message: "Wrong type submitted" });
+    return;
   }
 
   Booking.findOne({
