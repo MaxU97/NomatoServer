@@ -19,14 +19,14 @@ exports.withdraw = (req, res) => {
     const balance = await stripe.balance.retrieve({
       stripeAccount: user.sellerID,
     });
-    if (balance.available[0].amount < req.body.amount) {
+    if (balance.available[0].amount < req.body.amount * 100) {
       res.status(403).send({ message: "You do not have enough settled funds" });
       return;
     } else {
       const payout = await stripe.payouts.create(
         {
-          amount: amount * 100,
-          currency: "usd",
+          amount: req.body.amount * 100,
+          currency: "eur",
         },
         {
           stripeAccount: user.sellerID,

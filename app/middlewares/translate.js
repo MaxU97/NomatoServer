@@ -1,74 +1,82 @@
 const axios = require("axios");
 
-exports.checkLanguages = (descEN, descLV, descRU) => {
-  let EN, LV, RU;
-  let en, lv, ru;
-  if (descEN.length == 0) {
-    en = true;
-  } else {
-    EN = descEN;
-    en = false;
-  }
+exports.checkLanguage = (description) => {
+  const axios = require("axios");
 
-  if (descRU.length == 0) {
-    ru = true;
-  } else {
-    LV = descLV;
-    ru = false;
-  }
-
-  if (descLV.length == 0) {
-    lv = true;
-  } else {
-    RU = descRU;
-    lv = false;
-  }
-
-  if (en) {
-    EN = !lv ? translate(descRU, "en", "ru") : translate(descLV, "en", "lv");
-  }
-  if (ru) {
-    RU = !en ? translate(descEN, "ru", "en") : translate(descLV, "ru", "lv");
-  }
-  if (lv) {
-    LV = !en ? translate(descEN, "lv", "en") : translate(descRU, "lv", "ru");
-  }
-
-  return [EN, RU, LV];
-};
-
-const translate = async (text, to, from) => {
-  const encodedParams = new URLSearchParams();
-  encodedParams.append("text", text);
-  encodedParams.append("to", to);
-  encodedParams.append("from", from);
+  const data = [
+    {
+      Text: description,
+    },
+  ];
   const options = {
     method: "POST",
-    url: "https://nlp-translation.p.rapidapi.com/v1/translate",
+    url: "https://microsoft-translator-text.p.rapidapi.com/Detect",
+    params: { "api-version": "3.0" },
     headers: {
-      "content-type": "application/x-www-form-urlencoded",
-      "X-RapidAPI-Host": "nlp-translation.p.rapidapi.com",
+      "content-type": "application/json",
       "X-RapidAPI-Key": "c5c9bf999amshea9393e53a72314p141ec6jsn3b0184769137",
+      "X-RapidAPI-Host": "microsoft-translator-text.p.rapidapi.com",
     },
-    data: encodedParams,
+    data: JSON.stringify(data),
   };
 
-  // return axios.request("localhost:4000/").then((result) => {
-  //   let returnValue;
-  //   try {
-  //     Object.keys(result.data["translated_text"]).forEach((key) => {
-  //       returnValue = result.data["translated_text"][key];
-  //     });
-  //   } catch (err) {
-  //     returnValue = text + err.toString();
-  //   }
+  return axios
+    .request(options)
+    .then(function (response) {
+      return response.data;
+    })
+    .catch(function (error) {
+      console.error(error);
+    });
+};
 
-  //   return returnValue;
-  // });
-
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      resolve(text);
-    }, 300);
+exports.getTranslation = async (description, language) => {
+  var desc = "";
+  description.every((value, index) => {
+    if (value[language]) {
+      desc = value;
+      return false;
+    }
+    return true;
   });
+
+  if (!desc) {
+    desc = await translate(Object.values(description[0])[0], language);
+  }
+  return desc;
+};
+const translate = async (text, to) => {
+  const data = [
+    {
+      Text: text,
+    },
+  ];
+  const options = {
+    method: "POST",
+    url: "https://microsoft-translator-text.p.rapidapi.com/translate",
+    params: {
+      "to[0]": to,
+      "api-version": "3.0",
+      profanityAction: "NoAction",
+      textType: "plain",
+    },
+    headers: {
+      "content-type": "application/json",
+      "X-RapidAPI-Key": "c5c9bf999amshea9393e53a72314p141ec6jsn3b0184769137",
+      "X-RapidAPI-Host": "microsoft-translator-text.p.rapidapi.com",
+    },
+    data: JSON.stringify(data),
+  };
+
+  return await axios
+    .request(options)
+    .then(function (response) {
+      return {
+        [response.data[0]["translations"][0].to]:
+          response.data[0]["translations"][0].text,
+      };
+    })
+    .catch(function (error) {
+      console.error(error);
+    });
 };

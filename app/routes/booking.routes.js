@@ -65,4 +65,10 @@ module.exports = function (app) {
   app.post("/api/booking/scanQR", [authJwt.verifyToken], controller.scanQR);
 
   app.post("/api/booking/getQrHash", [authJwt.verifyToken], controller.qrHash);
+
+  app.post(
+    "/api/booking/getQty",
+    [authJwt.verifyToken],
+    controller.getAvailableQty
+  );
 };

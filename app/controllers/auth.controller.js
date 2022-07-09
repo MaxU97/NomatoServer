@@ -298,8 +298,10 @@ exports.getSelf = (req, res) => {
       Date.now(),
       user.addressLastChanged
     );
-    if (addressDiff === "NaN") {
-      addressDiff = 999;
+    if (!addressDiff) {
+      if (addressDiff != 0) {
+        addressDiff = 999;
+      }
     }
 
     var completed = true;
@@ -353,15 +355,17 @@ exports.updateUser = (req, res) => {
     const t = i18n(req.headers["accept-language"]);
     var phoneError;
     var addressError;
-
+    var updated = false;
     var stripeName = "";
     if (user.name != req.body.name) {
       user.name = req.body.name;
       stripeName = stripeName + " " + user.name;
+      updated = true;
     }
     if (user.surname != req.body.surname) {
       user.surname = req.body.surname;
       stripeName = stripeName + " " + user.surname;
+      updated = true;
     }
 
     if (stripeName) {
@@ -383,6 +387,7 @@ exports.updateUser = (req, res) => {
         user.phone = req.body.phone;
         user.phoneLastChanged = Date.now();
         await stripe.customers.update(user.stripeID, { phone: user.phone });
+        updated = true;
       }
     }
     if (req.body.latlng) {
@@ -393,16 +398,21 @@ exports.updateUser = (req, res) => {
           user.address = req.body.address;
           user.addressLatLng = req.body.latlng;
           user.addressLastChanged = Date.now();
+          updated = true;
         }
       }
     }
 
     user.save();
-    const message = [
-      t("user-update.update-success"),
-      phoneError && phoneError,
-      addressError && addressError,
-    ];
+
+    if (updated) {
+      var message = [t("user-update.update-success")];
+    } else {
+      var message = {
+        message: [t("user-update.nothing-changed")],
+        changed: updated,
+      };
+    }
 
     var completed = true;
     if (!user.name) {

@@ -5,6 +5,8 @@ const Item = db.item;
 const mongoose = require("mongoose");
 const { objectIdSymbol } = require("mongoose/lib/helpers/symbols");
 const { item } = require("../models");
+const path = require("path");
+const fs = require("fs");
 exports.getCategories = (req, res) => {
   Category.find()
     .populate("subcats")
@@ -41,6 +43,10 @@ const getSubcategories = async (subcats) => {
 };
 
 exports.createCategory = async (req, res) => {
+  if (!req.file) {
+    res.status(500).send({ message: "Please attach an image" });
+    return;
+  }
   try {
     const category = req.body;
 
@@ -58,30 +64,37 @@ exports.createCategory = async (req, res) => {
         Category.findOne({ _id: mongoose.Types.ObjectId(category._id) }).exec(
           async (err, cat) => {
             if ("file" in req) {
+              fs.unlink(
+                path.join(process.cwd(), "uploads", cat.imageURL),
+                function (err) {
+                  if (err) throw err;
+                  console.log("File deleted!");
+                }
+              );
               cat.imageURL = "CategoryIcons/" + req.file.filename;
             }
             cat.titleRU = category.titleRU;
             cat.titleEN = category.titleEN;
             cat.titleLV = category.titleLV;
 
+            let newSubcats = [...subcatIDs];
+            Object.values(cat.subcats).forEach((sub) => {
+              newSubcats.push(sub.toString());
+            });
             if ("deletedSubcats" in category) {
               category.deletedSubcats = JSON.parse(category.deletedSubcats);
 
               await SubCategory.deleteMany({
                 _id: { $in: category.deletedSubcats },
               });
-
-              let newSubcats = [];
-              Object.values(cat.subcats).forEach((sub) => {
-                newSubcats.push(sub.toString());
-              });
               newSubcats.map((sub, index) => {
                 if (category.deletedSubcats.includes(sub)) {
                   newSubcats.splice(index, 1);
                 }
               });
-              cat.subcats = newSubcats;
             }
+
+            cat.subcats = newSubcats;
 
             cat.save();
             res.status(200).send("All Correct");
@@ -114,11 +127,15 @@ exports.createCategory = async (req, res) => {
           subcats: subcatIDs,
         });
         cat.save();
-        res.status(200).send("All Correct");
+        Category.find()
+          .populate("subcats")
+          .then((results) => {
+            res.status(200).send(results);
+          });
       });
     }
   } catch (err) {
-    res.status(500).send(err.message);
+    res.status(500).send({ message: err.message });
   }
 };
 
@@ -162,7 +179,15 @@ exports.checkExisting = async (req, res) => {
 exports.deleteCategory = (req, res) => {
   Category.deleteOne({ _id: mongoose.Types.ObjectId(req.body._id) }).exec(
     (err, del) => {
-      res.status(200).send({ message: "Deleted" });
+      if (err) {
+        res.status(500).send({ message: "Something Went Wrong" });
+        return;
+      }
+      Category.find()
+        .populate("subcats")
+        .then((results) => {
+          res.status(200).send(results);
+        });
     }
   );
 };

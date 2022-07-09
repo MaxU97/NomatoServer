@@ -4,37 +4,34 @@ const path = require("path");
 const mongoose = require("mongoose");
 const Item = db.item;
 const Booking = db.booking;
-const { checkLanguages } = require("../middlewares/translate");
+const { checkLanguage, getTranslation } = require("../middlewares/translate");
 const { getNaturalAddress } = require("../middlewares/geocoder");
 const {
   parseAddressSpecific,
   getNaturalFromLongLat,
 } = require("../utility/addressUtilities");
-const { getDaysBetween } = require("../utility/datesUtilities");
+const { getDaysBetween, filterDates } = require("../utility/datesUtilities");
 exports.upload = (req, res) => {
-  const translations = checkLanguages(
-    req.body.descEN,
-    req.body.descRU,
-    req.body.descLV
-  );
+  const detectedLanguage = checkLanguage(req.body.description);
   let images = [];
   req.files.forEach((image) => {
     images.push(image.filename);
   });
 
-  Promise.all(translations).then(async (result) => {
+  Promise.all([detectedLanguage]).then(async (result) => {
     const address = {
       type: "Point",
       coordinates: [req.body.addressLng, req.body.addressLat],
     };
+    const newDescription = [
+      { [result[0][0]["language"]]: req.body.description },
+    ];
     const item = new Item({
       title: req.body.title,
       images: images,
       address: address,
       category: req.body.category,
-      descEN: result[0], //English
-      descLV: result[1], //Russian
-      descRU: result[2], //Latvian
+      description: newDescription,
       itemQty: req.body.itemQty,
       itemValue: req.body.itemValue,
       minRent: req.body.minRent,
@@ -53,10 +50,15 @@ exports.upload = (req, res) => {
       item.subcat = req.body.subcat;
       await item.populate("category");
       await item.populate("subcat");
-      tags = generateTags(item.title, result, item.category, item.subcat);
+      tags = generateTags(
+        item.title,
+        Object.values(item.description[0])[0],
+        item.category,
+        item.subcat
+      );
     } else {
       await item.populate("category");
-      tags = generateTags(item.title, result, item.category, "");
+      tags = generateTags(item.title, description, item.category, "");
     }
 
     item.tagCloud = tags;
@@ -94,16 +96,58 @@ exports.get = (req, res) => {
             itemID: id,
             status: { $in: ["approved", "with_customer", "returned"] },
           },
-          { dateStart: 1, dateEnd: 1 }
-        ).exec((err, bookings) => {
+          { dateStart: 1, dateEnd: 1, qtyWant: 1 }
+        ).exec(async (err, bookings) => {
           let subcat;
 
           var bookedDates = [];
+          var qtyAndBookedDates = [];
           if (bookings.length > 0) {
             bookings.forEach((booking) => {
               const dates = getDaysBetween(booking.dateStart, booking.dateEnd);
-              bookedDates.push(...dates);
+              const dateObject = dates.reduce(
+                (a, v) => ({ ...a, [v]: booking.qtyWant }),
+                {}
+              );
+              qtyAndBookedDates.push(dateObject);
             });
+
+            var obj = {};
+            qtyAndBookedDates.forEach((obj2) => {
+              obj = Object.entries(obj2).reduce(
+                (acc, [key, value]) =>
+                  // if key is already in map1, add the values, otherwise, create new pair
+                  ({ ...acc, [key]: (acc[key] || 0) + value }),
+                { ...obj }
+              );
+            });
+
+            bookedDates = filterDates(obj, item.itemQty);
+          }
+
+          var addNew = false;
+          const translatedDescription = await getTranslation(
+            item.description,
+            req.headers["accept-language"]
+          );
+
+          item.description.every((value, index) => {
+            if (
+              Object.keys(value)[0] === Object.keys(translatedDescription)[0]
+            ) {
+              addNew = false;
+              return false;
+            } else {
+              addNew = true;
+              return true;
+            }
+          });
+
+          if (addNew) {
+            var newDesc = item.description;
+            newDesc = [...newDesc, translatedDescription];
+            item.description = newDesc;
+            item.save();
           }
 
           if (item.subcat) {
@@ -129,9 +173,8 @@ exports.get = (req, res) => {
                 titleLV: item.category.titleLV,
               },
               subcat: subcat,
-              descEN: item.descEN,
-              descRU: item.descRU,
-              descLV: item.descLV,
+              description: Object.values(translatedDescription)[0],
+              originalDescription: Object.values(item.description[0])[0],
               itemQty: item.itemQty,
               itemValue: item.itemValue,
               minRent: item.minRent,
@@ -294,7 +337,7 @@ exports.searchItems = (req, res) => {
     });
 };
 
-const generateTags = (title, result, category, subcat) => {
+const generateTags = (title, description, category, subcat) => {
   tagCloud = [];
 
   tagCloud = [...tagCloud, ...title.split(/[,!?. ]+/)];
@@ -308,9 +351,8 @@ const generateTags = (title, result, category, subcat) => {
     tagCloud = [...tagCloud, ...subcat.titleEN.split(/[,!?. ]+/)];
   }
 
-  result.map((res) => {
-    tagCloud = [...tagCloud, ...res.split(/[,!?. ]+/)];
-  });
+  tagCloud = [...tagCloud, ...description.split(/[,!?. ]+/)];
+
   tagCloud = tagCloud
     .map((element) => {
       return element.toUpperCase();
@@ -337,21 +379,16 @@ exports.update = (req, res) => {
           $in: ["approval_required", "approved", "with_customer", "returned"],
         },
       }).exec((err, bookings) => {
-        if (bookings) {
-          if (bookings.length > 0) {
-            res.status(403).send({
-              message:
-                "Items cannot be edited if there are any bookings waiting for approval, or they have been rented before",
-            });
-            return;
-          }
+        if (bookings.length > 0) {
+          res.status(403).send({
+            message:
+              "Items cannot be edited if there are any bookings waiting for approval, or they have been rented before",
+          });
+          return;
         } else {
           if (item.user._id == req.userId || req.isAdmin) {
-            const translations = checkLanguages(
-              req.body.descEN,
-              req.body.descRU,
-              req.body.descLV
-            );
+            const detectedLanguage = checkLanguage(req.body.description);
+
             let images = [];
             req.files.forEach((image) => {
               images.push(image.filename);
@@ -359,7 +396,7 @@ exports.update = (req, res) => {
 
             //saving images for delete
             const oldImages = item.images;
-            Promise.all(translations).then(async (result) => {
+            Promise.all([detectedLanguage]).then(async (result) => {
               const address = {
                 type: "Point",
                 coordinates: [req.body.addressLng, req.body.addressLat],
@@ -368,9 +405,11 @@ exports.update = (req, res) => {
               item.images = images;
               item.address = address;
               item.category = req.body.category;
-              item.descEN = result[0]; //English
-              item.descLV = result[1]; //Russian
-              item.descRU = result[2]; //Latvian
+              item.description = [
+                {
+                  [result[0][0]["language"]]: req.body.description,
+                },
+              ];
               item.itemQty = req.body.itemQty;
               item.itemValue = req.body.itemValue;
               item.minRent = req.body.minRent;
@@ -386,13 +425,18 @@ exports.update = (req, res) => {
                 await item.populate("subcat");
                 tags = generateTags(
                   item.title,
-                  result,
+                  Object.values(item.description[0])[0],
                   item.category,
                   item.subcat
                 );
               } else {
                 await item.populate("category");
-                tags = generateTags(item.title, result, item.category, "");
+                tags = generateTags(
+                  item.title,
+                  Object.values(item.description[0])[0],
+                  item.category,
+                  ""
+                );
               }
 
               item.tagCloud = tags;

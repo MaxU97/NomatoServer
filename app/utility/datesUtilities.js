@@ -8,3 +8,17 @@ exports.getDaysBetween = (s, e) => {
   }
   return a;
 };
+
+exports.filterDates = (object, itemQty) => {
+  return Object.keys(object).filter(function (el) {
+    return object[el] >= itemQty;
+  });
+};
+
+exports.getDatesWithinRange = (dates, from, to) => {
+  return dates.map((date) => {
+    if (date >= new Date(from) && date <= new Date(to)) {
+      return date;
+    }
+  });
+};

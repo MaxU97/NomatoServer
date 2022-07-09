@@ -10,7 +10,7 @@ const path = require("path");
 const https = require("https");
 
 var corsOptions = {
-  origin: "https://localhost:3000",
+  origin: process.env.corsOrigin,
 };
 
 app.use(cors(corsOptions));

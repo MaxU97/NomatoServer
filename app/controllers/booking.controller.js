@@ -13,8 +13,12 @@ const sendApprovalNotification = require("../services/scheduler/jobs/sendApprova
 const sendRefusalNotification = require("../services/scheduler/jobs/sendRefusalNotification");
 const sendRequestNotification = require("../services/scheduler/jobs/sendRequestNotification");
 const i18n = require("../../locales/i18n");
-const { getDaysBetween } = require("../utility/datesUtilities");
+const {
+  getDaysBetween,
+  getDatesWithinRange,
+} = require("../utility/datesUtilities");
 const { secret_key, iv } = require("../config/auth.config");
+const _ = require("lodash");
 exports.getServiceFee = (req, res) => {
   res.send({ serviceFee: process.env.SERVICE_FEE });
 };
@@ -605,6 +609,70 @@ exports.scanQR = (req, res) => {
       booking.save();
       res.send({ status: true, message: message });
     });
+};
+
+exports.getAvailableQty = (req, res) => {
+  const { from, to } = req.body.dates;
+  Item.findOne(
+    { _id: mongoose.Types.ObjectId(req.body.itemID) },
+    {
+      itemQty: 1,
+    }
+  ).exec((err, item) => {
+    if (err) {
+      res.status(500).send({ status: false, message: t("error") });
+      return;
+    }
+    if (!item) {
+      res.status(404).send({ message: "Item Not Found" });
+      return;
+    }
+    Booking.find(
+      {
+        status: { $in: ["approved", "with_customer"] },
+
+        $nor: [
+          { dateEnd: { $lte: new Date(from) } },
+          { dateStart: { $gte: new Date(to) } },
+        ],
+
+        itemID: req.body.itemID,
+      },
+      { qtyWant: 1, dateStart: 1, dateEnd: 1 }
+    ).exec((err, bookings) => {
+      if (err) {
+        res.status(500).send({ status: false, message: t("error") });
+        return;
+      }
+      if (_.isEmpty(bookings)) {
+        res.status(200).send({ qtyAvailable: item.itemQty });
+        return;
+      }
+
+      var qtyAndBookedDates = [];
+      bookings.forEach((booking) => {
+        var dates = getDaysBetween(booking.dateStart, booking.dateEnd);
+        dates = getDatesWithinRange(dates, from, to);
+        const dateObject = dates.reduce(
+          (a, v) => ({ ...a, [v]: booking.qtyWant }),
+          {}
+        );
+        delete dateObject["undefined"];
+        qtyAndBookedDates.push(dateObject);
+      });
+
+      var obj = {};
+      qtyAndBookedDates.forEach((obj2) => {
+        obj = Object.entries(obj2).reduce(
+          (acc, [key, value]) => ({ ...acc, [key]: (acc[key] || 0) + value }),
+          { ...obj }
+        );
+      });
+
+      var max = Math.max(...Object.values(obj));
+      res.status(200).send({ qtyAvailable: item.itemQty - max });
+    });
+  });
 };
 
 const getPrice = (dateEnd, dateStart, qtyWant, item) => {
