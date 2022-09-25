@@ -1,0 +1,50 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Booking Approved!</title>
+    <style>
+      .email { align: center; text-align: center; font-family: Arial, Helvetica,
+      sans-serif; background-image:
+      url(http://localhost:3000/static/media/home-background.e8cafb5ee440dd77d540.png);
+      background-size: cover; background-position: center; min-height: 300px; }
+      .email-title { font-size: 30px; } .name { color: #3299de; }
+      .item-container {display: inline-flex; align:center; border-radius: 15px;
+      border: 1px solid #a3a3a3; padding: 20px; } .item-container img{ width:
+      250px; height: auto; border-radius: 15px; } .item-details { display:
+      block; height: 100%;margin-top:10px; margin-left: 20px; text-align: start;
+      } .item-name{color: #3299de; font-size:20px; text-align: left; }
+      .item-date{font-size:18px; margin-bottom:10px} .helper{margin-top: 10px}
+      .item-button-a{text-decoration: none !important; text-align: center;
+      padding: 28px 20px; border-radius: 15px; color: white !important ;
+      font-size: 18px} .item-button{text-decoration: none !important;
+      text-align: center; padding: 28px 20px; background-color: #3299de;
+      border-radius: 15px; color: white !important ; font-size: 18px; width:
+      200px; margin: auto}
+    </style>
+  </head>
+  <body>
+    <div class="email">
+      <div class="email-title">
+        <div class="name">Hi
+          {{name}}!</div>
+        Thank you for renting
+        {{item_name}}
+        with
+        {{owner_name}}
+      </div>
+      <div class="email-content">
+        <p>If you don't mind leaving the item a review by clicking on the button
+          below</p>
+        <div class="item-button"><a
+            class="item-button-a"
+            href="https://nomato.eu/paymentDetails/{this.userID}"
+          >Leave a review</a></div>
+        <div class="helper">
+          Thank you!
+        </div>
+      </div>
+
+    </div>
+
+  </body>
+</html>

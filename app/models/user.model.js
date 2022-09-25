@@ -9,7 +9,6 @@ const User = mongoose.model(
     phoneLastChanged: Date,
     address: Array,
     addressLatLng: Object,
-    addressLastChanged: Date,
     password: { type: String, required: true },
     admin: { type: Boolean, required: true, default: false },
     profileImage: {
@@ -17,11 +16,9 @@ const User = mongoose.model(
       required: true,
       default: "defaultProfile.svg",
     },
-    stripeID: { type: String, required: true },
-    sellerID: { type: String, require: true },
-    sellerCompleted: { type: Boolean, default: false },
     lastActive: Date,
     languages: { type: [String], default: ["EN", "RU", "LV"] },
+    customerID: String,
     completionStatus: { type: Boolean, default: false },
   })
 );

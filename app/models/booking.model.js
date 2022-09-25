@@ -17,14 +17,14 @@ const Booking = mongoose.model(
     },
     comment: String,
     refuseReason: String,
+    reviewed: Boolean,
     dateStart: Date,
     dateEnd: Date,
     qtyWant: Number,
     status: String,
     piid: String,
     intentID: String,
-    chargeID: String,
-    saveCard: String,
+    created: Date,
   })
 );
 

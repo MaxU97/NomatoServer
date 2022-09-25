@@ -43,10 +43,6 @@ const getSubcategories = async (subcats) => {
 };
 
 exports.createCategory = async (req, res) => {
-  if (!req.file) {
-    res.status(500).send({ message: "Please attach an image" });
-    return;
-  }
   try {
     const category = req.body;
 
@@ -102,6 +98,10 @@ exports.createCategory = async (req, res) => {
         );
       });
     } else {
+      if (!req.file) {
+        res.status(500).send({ message: "Please attach an image" });
+        return;
+      }
       //adding new one
       category.subcats = JSON.parse(category.subcats);
       var promises = [];

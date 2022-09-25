@@ -1,0 +1,37 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Confirmation code</title>
+    <style>
+      .email { align: center; text-align: center; font-family: Arial, Helvetica,
+      sans-serif; background-image:
+      url(http://localhost:3000/static/media/home-background.e8cafb5ee440dd77d540.png);
+      background-size: cover; background-position: center; min-height: 300px; }
+      .email-title { font-size: 30px; } .name { color: #3299de; }
+      .item-container {display: inline-flex; align:center; border-radius: 15px;
+      border: 1px solid #a3a3a3; padding: 20px; } .item-container img{ width:
+      250px; height: auto; border-radius: 15px; } .item-details { display:
+      block; height: 100%;margin-top:10px; margin-left: 20px; text-align: start;
+      } .item-name{color: #3299de; font-size:20px; text-align: left; }
+      .item-date{font-size:18px; margin-bottom:10px} .helper{margin-top: 10px}
+      .item-button-a{text-decoration: none !important; text-align: center;
+      padding: 28px 20px; border-radius: 15px; color: white !important ;
+      font-size: 18px} .item-button{text-decoration: none !important;
+      text-align: center; padding: 28px 20px; background-color: #3299de;
+      border-radius: 15px; color: white !important ; font-size: 18px}
+      .email-content strong{
+        color: #3299de
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email">
+      <div class="email-title">
+        <div class="name">We have sent €{{amount}} to your account</div>
+      </div>
+      <div class="email-content">
+        <p>We will let you know if there are any problems with the transaction</p>
+    </div>
+
+  </body>
+</html>

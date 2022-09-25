@@ -4,6 +4,30 @@ const db = require("../models");
 const User = db.user;
 const Role = db.role;
 var bcrypt = require("bcryptjs");
+const axios = require("axios");
+
+validateHuman = async (req, res, next) => {
+  if (req.body.token) {
+    const response = await axios
+      .post(
+        `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_TOKEN}&response=${req.body.token}`
+      )
+      .then(({ data }) => {
+        console.log(data.success);
+        if (data.success) {
+          next();
+        } else {
+          res.status(400).send({ message: "ReCaptcha Failed" });
+        }
+      })
+      .catch((err) => {
+        throw err;
+      });
+  } else {
+    next();
+  }
+};
+
 verifyToken = (req, res, next) => {
   let token = req.headers["x-access-token"];
   if (!token) {
@@ -16,6 +40,16 @@ verifyToken = (req, res, next) => {
     req.userId = decoded.id;
     next();
   });
+};
+
+verifyInOp = (req, res, next) => {
+  let token = req.headers["x-access-token"];
+  if (!token) {
+    return res.status(403).send({ message: "No token provided!" });
+  }
+  if (token === process.env.AUTO_UPDATER_TOKEN) {
+    next();
+  }
 };
 
 isAdmin = (req, res, next) => {
@@ -84,27 +118,6 @@ isCompletedAccount = (req, res, next) => {
   }
 };
 
-isSeller = (req, res, next) => {
-  if (req.userId != null) {
-    User.findById(req.userId).exec((err, user) => {
-      if (err) {
-        res.status(500).send({ message: err });
-        return;
-      }
-      if (user.sellerCompleted) {
-        next();
-      } else {
-        res
-          .status(403)
-          .send({ message: "You have not set up your account with stripe" });
-        return;
-      }
-    });
-  } else {
-    next();
-  }
-};
-
 verifyPassword = (req, res, next) => {
   if (req.userId != null) {
     User.findById(req.userId).exec((err, user) => {
@@ -144,13 +157,14 @@ verifyPassword = (req, res, next) => {
   }
 };
 const authJwt = {
+  verifyInOp,
   verifyToken,
   verifyPassword,
   isAdmin,
   appendAdmin,
   appendUser,
   isCompletedAccount,
-  isSeller,
+  validateHuman,
 };
 
 module.exports = authJwt;

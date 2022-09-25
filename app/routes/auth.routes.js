@@ -38,7 +38,7 @@ module.exports = function (app, uploadProfilePicture) {
     controller.resendPhoneCode
   );
   app.post("/api/auth/confirmPhone", controller.confirmPhone);
-  app.post("/api/auth/login", controller.signin);
+  app.post("/api/auth/login", [authJwt.validateHuman], controller.signin);
   app.post("/api/auth/sendForgetEmail", controller.sendForgetEmail);
   app.post(
     "/api/auth/resendForgotPassword",
@@ -75,19 +75,14 @@ module.exports = function (app, uploadProfilePicture) {
   );
 
   app.get(
-    "/api/auth/requestAccount",
-    [authJwt.verifyToken, authJwt.isCompletedAccount],
-    controller.registerLender
-  );
-  app.get(
-    "/api/auth/checkStripeCompletion",
+    "/api/auth/userBalance",
     [authJwt.verifyToken],
-    controller.checkStripeCompletion
+    controller.userBalance
   );
 
-  app.get(
-    "/api/auth/userBalance",
-    [authJwt.verifyToken, authJwt.isSeller],
-    controller.userBalance
+  app.post(
+    "/api/auth/createStripeAccount",
+    [authJwt.verifyToken],
+    controller.createStripeAccount
   );
 };

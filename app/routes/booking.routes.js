@@ -10,26 +10,24 @@ module.exports = function (app) {
   });
 
   app.post("/api/booking/request", [authJwt.verifyToken], controller.request);
+
+  app.post(
+    "/api/booking/recordBooking",
+    [authJwt.verifyToken],
+    controller.recordBooking
+  );
+
   app.get(
     "/api/booking/getBookingHistory",
     [authJwt.verifyToken],
     controller.getBookingHistory
   );
   app.get(
-    "/api/booking/getPaymentMethods",
-    [authJwt.verifyToken],
-    controller.getPaymentMethods
-  );
-  app.get(
     "/api/booking/getRequests",
     [authJwt.verifyToken],
     controller.getRequests
   );
-  app.post(
-    "/api/booking/recordBooking",
-    [authJwt.verifyToken],
-    controller.recordBooking
-  );
+
   app.post(
     "/api/booking/sendBookingToOwner",
     [authJwt.verifyToken],
@@ -70,5 +68,11 @@ module.exports = function (app) {
     "/api/booking/getQty",
     [authJwt.verifyToken],
     controller.getAvailableQty
+  );
+
+  app.post(
+    "/api/booking/checkBookings",
+    [authJwt.verifyInOp],
+    controller.checkExpiredBookings
   );
 };

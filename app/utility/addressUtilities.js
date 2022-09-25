@@ -2,8 +2,16 @@ exports.parseAddressFull = (address) => {
   return address[0].formatted_address;
 };
 
+exports.addressType = {
+  number: "street_number",
+  road: "route",
+  sublocality: "sublocality",
+  locality: "locality",
+  postCode: "postal_code",
+};
+
 exports.parseAddressSpecific = (address, type) => {
-  var toReturn;
+  var toReturn = "";
   address.map((entry) => {
     if (entry.types.includes(type)) {
       toReturn = entry.long_name;

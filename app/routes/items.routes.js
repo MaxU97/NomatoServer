@@ -38,4 +38,14 @@ module.exports = function (app, upload) {
   app.get("/api/item/getpopular", controller.getPopular);
   app.get("/api/item/me", [authJwt.verifyToken], controller.getSelf);
   app.post("/api/item/search", controller.searchItems);
+  app.get(
+    "/api/item/reviewItem",
+    [authJwt.verifyToken],
+    controller.getForReview
+  );
+  app.post(
+    "/api/item/submitReview",
+    [authJwt.verifyToken],
+    controller.submitReview
+  );
 };

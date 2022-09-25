@@ -7,7 +7,12 @@ const News = mongoose.model(
       ref: "User",
       required: true,
     },
+    language: String,
+    body: String,
+    title: String,
+    image: String,
     dateAdded: Date,
+    hidden: { type: Boolean, required: true, default: false },
     deleted: { type: Boolean, required: true, default: false },
   })
 );

@@ -1,0 +1,41 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pick up Notice</title>
+    <style>
+      .email { align: center; text-align: center; font-family: Arial, Helvetica,
+      sans-serif; background-image:
+      url(http://localhost:3000/static/media/home-background.e8cafb5ee440dd77d540.png);
+      background-size: cover; background-position: center; min-height: 300px; }
+      .email-title { font-size: 30px; } .name { color: #3299de; }
+      .item-button-a{text-decoration: none !important; text-align: center;
+      padding: 28px 20px; border-radius: 15px; color: white !important ;
+      font-size: 18px} .item-button{text-decoration: none !important;
+      text-align: center; padding: 28px 20px; background-color: #3299de;
+      border-radius: 15px; color: white !important ; font-size: 18px; width:
+      200px; margin: auto} .email-content{ display: block; max-width: 600px;
+      margin: auto} .helper{margin-top: 10px}
+    </style>
+  </head>
+  <body>
+    <div class="email">
+      <div class="email-title">
+        <div class="name">Hi
+          {{name}}!</div>
+        You have just accepted your first rental!
+      </div>
+      <div class="email-content">
+        <p>In order to be able to get paid you need to submit your details</p>
+        <div class="item-button"><a
+            class="item-button-a"
+            href="https://nomato.eu/payment-details"
+          >Submit Details</a></div>
+
+      </div>
+
+      <p class="helper"><strong>You will not be able to get paid if you do not
+          submit details.</strong></p>
+    </div>
+
+  </body>
+</html>

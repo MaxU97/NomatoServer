@@ -4,6 +4,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const Item = db.item;
 const Booking = db.booking;
+const Review = db.review;
 const { checkLanguage, getTranslation } = require("../middlewares/translate");
 const { getNaturalAddress } = require("../middlewares/geocoder");
 const {
@@ -11,6 +12,7 @@ const {
   getNaturalFromLongLat,
 } = require("../utility/addressUtilities");
 const { getDaysBetween, filterDates } = require("../utility/datesUtilities");
+
 exports.upload = (req, res) => {
   const detectedLanguage = checkLanguage(req.body.description);
   let images = [];
@@ -58,7 +60,12 @@ exports.upload = (req, res) => {
       );
     } else {
       await item.populate("category");
-      tags = generateTags(item.title, description, item.category, "");
+      tags = generateTags(
+        item.title,
+        Object.values(item.description[0])[0],
+        item.category,
+        ""
+      );
     }
 
     item.tagCloud = tags;
@@ -158,44 +165,68 @@ exports.get = (req, res) => {
               titleLV: item.subcat.titleLV,
             };
           }
-          const response = {
-            item: {
-              address: {
-                lng: item.address.coordinates[0],
-                lat: item.address.coordinates[1],
-              },
-              title: item.title,
-              images: item.images,
-              category: {
-                id: item.category._id,
-                titleRU: item.category.titleRU,
-                titleEN: item.category.titleEN,
-                titleLV: item.category.titleLV,
-              },
-              subcat: subcat,
-              description: Object.values(translatedDescription)[0],
-              originalDescription: Object.values(item.description[0])[0],
-              itemQty: item.itemQty,
-              itemValue: item.itemValue,
-              minRent: item.minRent,
-              rentPriceDay: item.rentPriceDay,
-              rentPriceWeek: item.rentPriceWeek,
-              rentPriceMonth: item.rentPriceMonth,
-              likes: item.likes,
-              dislikes: item.dislikes,
-              reviews: item.reviews,
-              bookedDates: bookedDates,
-              user: {
-                id: item.user._id,
-                name: item.user.name,
-                profileImage: item.user.profileImage,
-                lastActive: item.user.lastActive,
-              },
-              status: item.status,
-            },
-          };
 
-          res.status(200).send(response);
+          Review.find({
+            itemID: mongoose.Types.ObjectId(req.body.id),
+            // language: req.headers["accept-language"].toUpperCase(),
+          })
+            .sort({ _id: -1 })
+            .limit(1)
+            .populate("userID")
+            .exec((err, review) => {
+              var recentReview;
+
+              if (review[0]) {
+                recentReview = {
+                  id: review[0].id,
+                  text: review[0].text,
+                  type: review[0].type,
+                  username: review[0].userID.name,
+                  image: review[0].userID.profileImage,
+                };
+              } else {
+                recentReview = null;
+              }
+
+              const response = {
+                item: {
+                  address: {
+                    lng: item.address.coordinates[0],
+                    lat: item.address.coordinates[1],
+                  },
+                  title: item.title,
+                  images: item.images,
+                  category: {
+                    id: item.category._id,
+                    titleRU: item.category.titleRU,
+                    titleEN: item.category.titleEN,
+                    titleLV: item.category.titleLV,
+                  },
+                  subcat: subcat,
+                  description: Object.values(translatedDescription)[0],
+                  originalDescription: Object.values(item.description[0])[0],
+                  itemQty: item.itemQty,
+                  itemValue: item.itemValue,
+                  minRent: item.minRent,
+                  rentPriceDay: item.rentPriceDay,
+                  rentPriceWeek: item.rentPriceWeek,
+                  rentPriceMonth: item.rentPriceMonth,
+                  likes: item.likes,
+                  dislikes: item.dislikes,
+                  bookedDates: bookedDates,
+                  user: {
+                    id: item.user._id,
+                    name: item.user.name,
+                    profileImage: item.user.profileImage,
+                    lastActive: item.user.lastActive,
+                  },
+                  status: item.status,
+                  recentReview: recentReview,
+                },
+              };
+
+              res.status(200).send(response);
+            });
         });
       })
       .catch((err) => {
@@ -229,7 +260,7 @@ exports.getPopular = (req, res) => {
           title: r.title,
           username: r.user.name,
           likes: r.likes,
-          ratingAmount: r.reviews.length,
+          ratingAmount: 0, //TODO
           location: parseAddressSpecific(r.addressNatural, "locality"),
           imageURL: r.images[0],
           rentPriceDay: r.rentPriceDay,
@@ -317,7 +348,7 @@ exports.searchItems = (req, res) => {
             title: r.title,
             username: r.user.name,
             likes: r.likes,
-            ratingAmount: r.reviews.length,
+            // ratingAmount: r.reviews.length,
             latLng: {
               lng: r.address.coordinates[0],
               lat: r.address.coordinates[1],
@@ -593,4 +624,73 @@ exports.getSelf = (req, res) => {
 
     res.status(200).send({ items: returnArray });
   });
+};
+
+exports.getForReview = (req, res) => {
+  Booking.findOne({
+    _id: mongoose.Types.ObjectId(req.query.id),
+    userID: mongoose.Types.ObjectId(req.userId),
+  })
+    .populate({ path: "itemID", select: { title: 1, _id: 0 } })
+    .exec((err, booking) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      if (!booking) {
+        res.status(500).send({ message: "Booking does not exist" });
+        return;
+      }
+      if (booking.reviewed == undefined || booking.reviewed == null) {
+        res.status(500).send({ message: "Booking does not exist" });
+        return;
+      }
+
+      res
+        .status(200)
+        .send({ title: booking.itemID.title, reviewed: booking.reviewed });
+      return;
+    });
+};
+
+exports.submitReview = (req, res) => {
+  if (!req.body.id || !req.body.review || !req.body.reviewType) {
+    res.status(500).send({ message: "Please fill all of the fields" });
+    return;
+  }
+  Booking.findOne({
+    _id: mongoose.Types.ObjectId(req.body.id),
+    userID: mongoose.Types.ObjectId(req.userId),
+  })
+    .populate({ path: "itemID", select: { _id: 1 } })
+    .exec((err, booking) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      if (!booking) {
+        res.status(500).send({ message: "Booking does not exist" });
+        return;
+      }
+      if (booking.reviewed == undefined || booking.reviewed == null) {
+        res.status(500).send({ message: "Booking does not exist" });
+        return;
+      }
+      if (booking.reviewed) {
+        res.status(500).send({ message: "Already reviewed" });
+        return;
+      }
+
+      var review = new Review({
+        userID: req.userId,
+        itemID: booking.itemID._id,
+        text: req.body.review,
+        datePosted: Date.now(),
+        type: req.body.reviewType ? "positive" : "negative",
+      });
+      booking.reviewed = true;
+      review.save();
+      booking.save();
+      res.status(200).send({ message: "Your review was submitted, thanks!" });
+    });
 };

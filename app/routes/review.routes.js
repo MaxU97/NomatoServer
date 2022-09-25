@@ -1,5 +1,7 @@
+const controller = require("../controllers/review.controller");
+
 const { authJwt } = require("../middlewares");
-const controller = require("../controllers/finance.controller");
+
 module.exports = function (app) {
   app.use(function (req, res, next) {
     res.header(
@@ -8,5 +10,10 @@ module.exports = function (app) {
     );
     next();
   });
-  app.post("/api/finance/withdraw", [authJwt.verifyToken], controller.withdraw);
+  app.post(
+    "/api/reviews/create",
+    [authJwt.verifyToken],
+    controller.createReview
+  );
+  app.get("/api/reviews/getReviews", controller.getReviews);
 };

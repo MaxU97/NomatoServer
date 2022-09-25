@@ -3,7 +3,7 @@ const db = require("../models");
 const mongoose = require("mongoose");
 const User = db.user;
 const PreReg = db.preregdetails;
-const stripe = require("stripe")(process.env.STRIPE_KEY);
+const Finance = db.finance;
 const differenceInCalendarDays = require("date-fns/differenceInCalendarDays");
 var jwt = require("jsonwebtoken");
 var bcrypt = require("bcryptjs");
@@ -12,38 +12,25 @@ const sendEmailConfirmation = require("../services/scheduler/jobs/sendEmailConfi
 const {
   parseAddress,
   parseAddressFull,
+  parseAddressSpecific,
+  addressType,
 } = require("../utility/addressUtilities");
 const sendForgotPasswordEmail = require("../services/scheduler/jobs/sendForgotPasswordEmail");
-
+const stripe = require("stripe")(process.env.STRIPE_KEY);
 const _ = require("lodash");
+const { getFinances } = require("../utility/financeUtility");
+const axios = require("axios");
 
 exports.signup = async (req, res) => {
   PreReg.findOneAndDelete({
     _id: mongoose.Types.ObjectId(req.body._id),
   }).exec(async (err, prereg) => {
-    const account = await stripe.accounts.create({
-      type: "express",
-      email: prereg.email,
-      settings: {
-        payouts: {
-          schedule: {
-            interval: "manual",
-          },
-        },
-      },
-    });
-    const customer = await stripe.customers.create({
-      email: prereg.email,
-      phone: prereg.phone,
-    });
     const user = new User({
       email: prereg.email,
       phone: prereg.phone,
       phoneLastChanged: Date.now(),
       password: prereg.password,
       lastActive: Date.now(),
-      stripeID: customer.id,
-      sellerID: account.id,
       languages: prereg.languages,
     });
     user.save((err) => {
@@ -66,7 +53,7 @@ exports.signup = async (req, res) => {
   });
 };
 
-exports.signin = (req, res) => {
+exports.signin = async (req, res) => {
   const t = i18n(req.headers["accept-language"]);
   User.findOne({
     email: req.body.email,
@@ -176,25 +163,25 @@ exports.preRegPhone = (req, res) => {
 };
 
 const sendPhoneConfirmation = async (req, code) => {
-  // http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
-  var axios = require("axios");
-  const t = i18n(req.headers["accept-language"]);
-  const text = t("phone-message") + " " + code;
-  const sender = "NomaTo";
-  const api = process.env.SMS_API;
-  const number = req.body.phone;
-  const url = `https://api1.esteria.lv/send?api-key=${api}&sender=${sender}&number=${number}&text=${text}`;
-  axios
-    .get(url)
-    .then((res) => {
-      console.log(res);
-      if (res.data < 100) {
-        throw "Something went wrong";
-      }
-    })
-    .catch((error) => {
-      throw error;
-    });
+  // // http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
+  // var axios = require("axios");
+  // const t = i18n(req.headers["accept-language"]);
+  // const text = t("phone-message") + " " + code;
+  // const sender = "NomaTo";
+  // const api = process.env.SMS_API;
+  // const number = req.body.phone;
+  // const url = `https://api1.esteria.lv/send?api-key=${api}&sender=${sender}&number=${number}&text=${text}`;
+  // axios
+  //   .get(url)
+  //   .then((res) => {
+  //     console.log(res);
+  //     if (res.data < 100) {
+  //       throw "Something went wrong";
+  //     }
+  //   })
+  //   .catch((error) => {
+  //     throw error;
+  //   });
 };
 
 exports.confirmEmail = (req, res) => {
@@ -294,15 +281,6 @@ exports.getSelf = (req, res) => {
       Date.now(),
       user.phoneLastChanged
     );
-    var addressDiff = differenceInCalendarDays(
-      Date.now(),
-      user.addressLastChanged
-    );
-    if (!addressDiff) {
-      if (addressDiff != 0) {
-        addressDiff = 999;
-      }
-    }
 
     var completed = true;
     if (!user.name) {
@@ -336,9 +314,8 @@ exports.getSelf = (req, res) => {
       lastActive: user.lastActive,
       languages: user.languages,
       allowPhoneEdit: !(phoneDiff < 30),
-      allowAddressEdit: !(addressDiff < 30),
       completionStatus: user.completionStatus,
-      sellerCompleted: user.sellerCompleted,
+      sellerCompleted: !!user.customerID,
     });
   });
 };
@@ -356,57 +333,56 @@ exports.updateUser = (req, res) => {
     var phoneError;
     var addressError;
     var updated = false;
-    var stripeName = "";
     if (user.name != req.body.name) {
       user.name = req.body.name;
-      stripeName = stripeName + " " + user.name;
       updated = true;
     }
     if (user.surname != req.body.surname) {
       user.surname = req.body.surname;
-      stripeName = stripeName + " " + user.surname;
       updated = true;
-    }
-
-    if (stripeName) {
-      await stripe.customers.update(user.stripeID, { name: stripeName });
     }
 
     const phoneDiff = differenceInCalendarDays(
       Date.now(),
       user.phoneLastChanged
     );
-    const addressDiff = differenceInCalendarDays(
-      Date.now(),
-      user.addressLastChanged
-    );
+
     if ("+" + user.phone != req.body.phone) {
       if (phoneDiff < 30) {
         phoneError = t("user-update.phone-err");
       } else {
         user.phone = req.body.phone;
         user.phoneLastChanged = Date.now();
-        await stripe.customers.update(user.stripeID, { phone: user.phone });
         updated = true;
       }
     }
     if (req.body.latlng) {
       if (!_.isEqual(user.address[0], req.body.address)) {
-        if (addressDiff < 30) {
-          addressError = t("user-update.address-err");
-        } else {
-          user.address = req.body.address;
-          user.addressLatLng = req.body.latlng;
-          user.addressLastChanged = Date.now();
-          updated = true;
+        user.address = req.body.address;
+        if (
+          !parseAddressSpecific(
+            req.body.address.address_components,
+            addressType.number
+          )
+        ) {
+          res.status(500).send({
+            message:
+              "Please make sure you choose an address that has a street number",
+          });
+          return;
         }
+        user.addressLatLng = req.body.latlng;
+        updated = true;
       }
     }
 
     user.save();
 
     if (updated) {
-      var message = [t("user-update.update-success")];
+      var message = {
+        message: [t("user-update.update-success")],
+        changed: updated,
+      };
     } else {
       var message = {
         message: [t("user-update.nothing-changed")],
@@ -441,9 +417,9 @@ exports.updateUser = (req, res) => {
       lastActive: user.lastActive,
       languages: user.languages,
       allowPhoneEdit: !(phoneDiff < 30),
-      allowAddressEdit: !(addressDiff < 30),
       message: message,
       completionStatus: user.completionStatus,
+      sellerCompleted: !!user.customerID,
     };
     res.status(200).send(response);
   });
@@ -570,107 +546,155 @@ exports.sendChangePassword = (req, res) => {
   );
 };
 
-exports.registerLender = (req, res) => {
-  User.findOne(
-    { _id: req.userId, sellerCompleted: false },
-    { sellerID: 1 }
-  ).exec(async (err, user) => {
-    if (err) {
-      res.status(500).send({ message: "Something went wrong" });
-      return;
-    }
-    if (!user) {
-      res.status(404).send({
-        message:
-          "User not found or account already registered. If you want to change the details, go to your profile",
-      });
-      return;
-    }
-
-    try {
-      const accountLink = await stripe.accountLinks.create({
-        account: user.sellerID,
-        refresh_url: `${process.env.WEBSITE_URL}become-a-lender`,
-        return_url: `${process.env.WEBSITE_URL}become-a-lender`,
-        type: "account_onboarding",
-      });
-      res.status(200).send({ url: accountLink.url });
-    } catch (err) {
-      res
-        .status(500)
-        .send({ message: "Something went wrong, please try again later" });
-      return;
-    }
-  });
-};
-
-exports.checkStripeCompletion = (req, res) => {
-  User.findOne({ _id: req.userId }).exec(async (err, user) => {
-    if (err) {
-      res.status(500).send({ message: "Something went wrong" });
-      return;
-    }
-    if (!user) {
-      res.status(404).send({ message: "User not found" });
-      return;
-    }
-    var address = "";
-    if (user.address.length > 0) {
-      address = parseAddressFull(user.address);
-    }
-
-    if (!user.sellerCompleted) {
-      const account = await stripe.accounts.retrieve(user.sellerID);
-      if (account.details_submitted) {
-        user.sellerCompleted = true;
-        user.save();
+exports.userBalance = (req, res) => {
+  User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
+    async (err, user) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      if (!user) {
+        res.status(404).send({ message: "User not found" });
+        return;
+      }
+      try {
+        if (user.customerID) {
+          const account = await stripe.balance.retrieve({
+            stripeAccount: user.customerID,
+          });
+          res.status(200).send({
+            pending: account.pending[0].amount,
+            available: account.available[0].amount,
+          });
+        } else {
+          res.status(200).send({
+            pending: 0,
+            available: 0,
+          });
+        }
+      } catch (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
       }
     }
-    res.status(200).send({
-      id: user._id,
-      name: user.name,
-      surname: user.surname,
-      address: address,
-      phone: user.phone,
-      email: user.email,
-      admin: user.admin,
-      profileImage: user.profileImage,
-      lastActive: user.lastActive,
-      languages: user.languages,
-      allowPhoneEdit: user.allowPhoneEdit,
-      allowAddressEdit: user.allowAddressEdit,
-      completionStatus: user.completionStatus,
-      sellerCompleted: user.sellerCompleted,
-    });
-  });
+  );
 };
 
-exports.userBalance = (req, res) => {
-  User.findOne(
-    { _id: mongoose.Types.ObjectId(req.userId) },
-    { sellerID: 1 }
-  ).exec(async (err, user) => {
-    if (err) {
-      res.status(500).send({ message: "Something went wrong" });
-      return;
+exports.createStripeAccount = (req, res) => {
+  User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
+    async (err, user) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      if (!user) {
+        res.status(404).send({ message: "User not found" });
+        return;
+      }
+      if (!req.body.name || !req.body.surname || !req.body.iban) {
+        res.status(404).send({ message: "Please submit all details" });
+        return;
+      }
+
+      const address = {
+        line1:
+          parseAddressSpecific(
+            user.address[0].address_components,
+            addressType.number
+          ) +
+          ", " +
+          parseAddressSpecific(
+            user.address[0].address_components,
+            addressType.road
+          ) +
+          ", " +
+          parseAddressSpecific(
+            user.address[0].address_components,
+            addressType.sublocality
+          ),
+        postal_code:
+          "LV-" +
+          parseAddressSpecific(
+            user.address[0].address_components,
+            addressType.postCode
+          ),
+        city: parseAddressSpecific(
+          user.address[0].address_components,
+          addressType.locality
+        ),
+      };
+
+      if (!user.customerID) {
+        const account = await stripe.accounts.create({
+          country: "LV",
+          type: "custom",
+          business_type: "individual",
+          settings: {
+            payouts: {
+              schedule: {
+                interval: "manual",
+              },
+            },
+          },
+
+          business_profile: {
+            mcc: 7394,
+            url: "nomato.eu/test",
+          },
+          tos_acceptance: {
+            ip: req.socket.remoteAddress,
+            date: Math.floor(Date.now() / 1000),
+          },
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+          individual: {
+            first_name: user.name,
+            last_name: user.surname,
+            dob: {
+              day: 14,
+              month: 10,
+              year: 1997,
+            },
+            address: address,
+            email: user.email,
+            phone: "+" + user.phone,
+          },
+        });
+        user.customerID = account.id;
+        user.save();
+      }
+
+      //TODO UPDATE EMAIL AND ADDRESS ON CHANGE
+      //TODO ADD A CHECK IF ADDRESS CONTAINS POSTALCODE
+      //TODO REPLACE THE DEFAULT EXTERNAL ACCOUNT
+      try {
+        const token = await stripe.tokens.create({
+          bank_account: {
+            country: "LV",
+            currency: "eur",
+            account_holder_name: req.body.name + " " + req.body.surname,
+            account_holder_type: "individual",
+            account_number: req.body.iban,
+          },
+        });
+
+        await stripe.accounts
+          .createExternalAccount(user.customerID, {
+            external_account: token.id,
+            default_for_currency: true,
+          })
+          .then(async (response) => {
+            res
+              .status(200)
+              .send({ message: "Your bank account has been linked" });
+          });
+      } catch (err) {
+        res.status(err.statusCode).send({ message: err.message });
+      }
     }
-    if (!user) {
-      res.status(404).send({ message: "User not found" });
-      return;
-    }
-    try {
-      const balance = await stripe.balance.retrieve({
-        stripeAccount: user.sellerID,
-      });
-      res.status(200).send({
-        pending: balance.pending[0].amount,
-        available: balance.available[0].amount,
-      });
-    } catch (err) {
-      res.status(500).send({ message: "Something went wrong" });
-      return;
-    }
-  });
+  );
 };
 
 const renewUser = (user, res) => {

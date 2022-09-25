@@ -11,9 +11,25 @@ module.exports = function (app, upload) {
   app.post(
     "/api/news/upload",
     [authJwt.verifyToken, authJwt.isAdmin],
-    upload.array("files", 5),
+    upload.array("files"),
     controller.upload
   );
   app.get("/api/news/getNews", controller.getNews);
-  app.get("/api/news/getNewsSpecific", controller.getNewsSpecific);
+  app.get("/api/news/get", controller.get);
+  app.patch(
+    "/api/news/toggleVisibility",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    controller.toggleVisibility
+  );
+  app.patch(
+    "/api/news/update",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    upload.array("files"),
+    controller.update
+  );
+  app.patch(
+    "/api/news/delete",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    controller.delete
+  );
 };

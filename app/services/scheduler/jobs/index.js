@@ -10,4 +10,23 @@ module.exports = [
       },
     },
   },
+  {
+    name: "autoCancelBooking",
+    interval: "every 10 seconds",
+    worker: {
+      workerData: {
+        description: "checks and deletes expired bookings",
+      },
+    },
+  },
+  {
+    name: "autoCancelApprovedBooking",
+    interval: "at 12:00am",
+    worker: {
+      workerData: {
+        description:
+          "checks and deletes approved bookings that weren't picked up on the day",
+      },
+    },
+  },
 ];

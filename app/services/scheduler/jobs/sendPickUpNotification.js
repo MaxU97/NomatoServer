@@ -86,6 +86,7 @@ const sendPickUpNotification = async () => {
               list: detailsArray,
             };
             mailer(mailOptions);
+            db.mongoose.connection.close();
           }
         });
     });

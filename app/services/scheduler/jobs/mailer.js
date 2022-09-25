@@ -4,7 +4,9 @@ const path = require("path");
 
 module.exports = (mailOptions) => {
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "mail.nomato.eu",
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL,
       pass: process.env.PASSWORD,
