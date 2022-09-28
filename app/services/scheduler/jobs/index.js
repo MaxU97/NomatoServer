@@ -15,7 +15,7 @@ module.exports = [
     interval: "every 10 seconds",
     worker: {
       workerData: {
-        description: "checks and deletes expired bookings",
+        description: "checks and deletes expired bookings for owners",
       },
     },
   },
