@@ -27,8 +27,45 @@ exports.getServiceFee = (req, res) => {
   res.send({ serviceFee: process.env.SERVICE_FEE });
 };
 
+const { set, isAfter, isBefore, parseISO, isSameDay } = require("date-fns");
+
 exports.request = async (req, res) => {
   let price;
+  var daySubmitted = set(parseISO(req.body.dateStart), {
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    milliseconds: 0,
+  });
+  var dayNow = set(new Date(Date.now()), {
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    milliseconds: 0,
+  });
+  var date12Today = set(new Date(Date.now()), {
+    hours: 12,
+    minutes: 0,
+    seconds: 0,
+    milliseconds: 0,
+  });
+
+  if (isAfter(Date.now(), date12Today)) {
+    if (isSameDay(daySubmitted, Date.now())) {
+      res.status(500).send({
+        message: "You cannot make a booking on the same day after 12",
+      });
+      return;
+    }
+  } else {
+    if (isBefore(daySubmitted, dayNow)) {
+      res.status(500).send({
+        message: "You cannot make a booking before today",
+      });
+      return;
+    }
+  }
+
   Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemID) })
     .populate("user")
     .exec((err, item) => {
@@ -302,8 +339,8 @@ const cancelApprovedBooking = async (req, res, booking) => {
         await stripe.transfers.create({
           amount: price / 2,
           currency: "eur",
+          source_transaction: booking.chargeID,
           destination: user.customerID,
-          transfer_group: booking._id,
         });
 
         await stripe.refunds.create({
@@ -330,7 +367,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
           amount: price,
           currency: "eur",
           destination: user.customerID,
-          transfer_group: booking._id,
+          source_transaction: booking.chargeID,
         });
         const finance = new Finance({
           user: booking.ownerID._id,
@@ -370,6 +407,14 @@ const cancelOtherBooking = async (req, res, booking) => {
     booking.save();
     res.status(200).send({ message: "Booking Canceled" });
   } catch (err) {
+    if (err.payment_intent) {
+      if (err.payment_intent.status == "canceled") {
+        booking.status = "canceled";
+        booking.save();
+        res.status(200).send({ message: "Booking Canceled" });
+        return;
+      }
+    }
     res.status(500).send({ message: "Something went wrong" });
   }
 };
@@ -423,6 +468,7 @@ exports.approveBooking = (req, res) => {
         const paymentIntent = await stripe.paymentIntents.capture(
           booking.intentID
         );
+        booking.chargeID = paymentIntent.charges.data[0].id;
         booking.status = "approved";
         booking.save();
       } catch (err) {
@@ -598,7 +644,7 @@ exports.scanQR = (req, res) => {
           amount: price,
           currency: "eur",
           destination: booking.ownerID.customerID,
-          transfer_group: booking._id,
+          source_transaction: booking.chargeID,
         });
 
         const finance = new Finance({
@@ -705,7 +751,7 @@ exports.checkExpiredBookings = (req, res) => {
   res.status(200).send();
   console.log();
   Booking.find({
-    created: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    // created: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
     status: { $in: ["approval_required"] },
   }).exec((err, bookings) => {
     if (!bookings) {
@@ -734,6 +780,7 @@ exports.checkApprovedBookings = (req, res) => {
     status: { $in: ["approved"] },
   })
     .populate("ownerID")
+    .populate("itemID")
     .exec((err, bookings) => {
       if (!bookings) {
         console.log("No bookings expired");
@@ -752,9 +799,9 @@ exports.checkApprovedBookings = (req, res) => {
             amount: price,
             currency: "eur",
             destination: booking.ownerID.customerID,
-            transfer_group: booking._id,
+            source_transaction: booking.chargeID,
           });
-          booking.status = ["canceled"];
+          booking.status = "canceled";
           booking.refuseReason = "Automatic Cancel";
           booking.save();
         } catch (err) {

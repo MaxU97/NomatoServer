@@ -26,7 +26,7 @@ exports.signup = async (req, res) => {
     _id: mongoose.Types.ObjectId(req.body._id),
   }).exec(async (err, prereg) => {
     const user = new User({
-      email: prereg.email,
+      email: prereg.email.toLowerCase(),
       phone: prereg.phone,
       phoneLastChanged: Date.now(),
       password: prereg.password,
@@ -56,7 +56,7 @@ exports.signup = async (req, res) => {
 exports.signin = async (req, res) => {
   const t = i18n(req.headers["accept-language"]);
   User.findOne({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
   }).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -89,7 +89,7 @@ exports.preRegEmail = (req, res) => {
   if (res.locals.emailExists) {
     //existing email in prereg database
     PreReg.findOne({
-      email: req.body.email,
+      email: req.body.email.toLowerCase(),
     }).exec((err, prereg) => {
       if (err) {
         res.status(500).send({ message: err });
@@ -109,7 +109,7 @@ exports.preRegEmail = (req, res) => {
     });
   } else {
     const preReg = new PreReg({
-      email: req.body.email,
+      email: req.body.email.toLowerCase(),
       password: bcrypt.hashSync(req.body.password, 8),
     });
 
@@ -129,7 +129,7 @@ exports.preRegEmail = (req, res) => {
 exports.preRegPhone = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
   PreReg.findOne({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
   }).exec(async (err, prereg) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -186,52 +186,16 @@ const sendPhoneConfirmation = async (req, code) => {
 
 exports.confirmEmail = (req, res) => {
   const t = i18n(req.headers["accept-language"]);
-  PreReg.findOne({ email: req.body.email }).exec((err, prereg) => {
-    if (err) {
-      res.status(500).send({ message: "Something went wrong" });
-      return;
-    }
-    if (prereg.emailConfirmNumber === req.body.code) {
-      prereg.confirmedEmail = true;
-      prereg.save();
-      res.status(200).send({ message: "Email Confirmed" });
-    } else {
-      res.status(401).send({ message: t("prereg.invalid-email") });
-    }
-  });
-};
-
-exports.resendEmailCode = (req, res) => {
-  const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
-  if (res.locals.emailExists) {
-    PreReg.findOne({ email: req.body.email }).exec((err, prereg) => {
-      if (err) {
-        res.status(500).send({ message: "Something went wrong" });
-        return;
-      }
-      prereg.emailConfirmNumber = number;
-      prereg.resentEmailDate = Date.now();
-      prereg.save();
-      sendEmailConfirmation(req.body.email, number);
-      res.status(200).send({ message: "Resent!" });
-    });
-  } else {
-    res.status(404).send({ message: "Email not found" });
-  }
-};
-
-exports.confirmPhone = (req, res) => {
-  const t = i18n(req.headers["accept-language"]);
-  PreReg.findOne({ email: req.body.email, phone: req.body.phone }).exec(
+  PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
     (err, prereg) => {
       if (err) {
         res.status(500).send({ message: "Something went wrong" });
         return;
       }
-      if (prereg.phoneConfirmNumber === req.body.code) {
-        prereg.confirmedPhone = true;
+      if (prereg.emailConfirmNumber === req.body.code) {
+        prereg.confirmedEmail = true;
         prereg.save();
-        res.status(200).send({ _id: prereg._id });
+        res.status(200).send({ message: "Email Confirmed" });
       } else {
         res.status(401).send({ message: t("prereg.invalid-email") });
       }
@@ -239,24 +203,66 @@ exports.confirmPhone = (req, res) => {
   );
 };
 
-exports.resendPhoneCode = (req, res) => {
+exports.resendEmailCode = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
   if (res.locals.emailExists) {
-    PreReg.findOne({ email: req.body.email, phone: req.body.phone }).exec(
-      async (err, prereg) => {
+    PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
+      (err, prereg) => {
         if (err) {
           res.status(500).send({ message: "Something went wrong" });
           return;
         }
-        if (prereg) {
-          prereg.phoneConfirmNumber = number;
-          prereg.resentPhoneDate = Date.now();
-          prereg.save();
-          await sendPhoneConfirmation(req, number);
-          res.status(200).send({ message: "Resent!" });
-        }
+        prereg.emailConfirmNumber = number;
+        prereg.resentEmailDate = Date.now();
+        prereg.save();
+        sendEmailConfirmation(req.body.email, number);
+        res.status(200).send({ message: "Resent!" });
       }
     );
+  } else {
+    res.status(404).send({ message: "Email not found" });
+  }
+};
+
+exports.confirmPhone = (req, res) => {
+  const t = i18n(req.headers["accept-language"]);
+  PreReg.findOne({
+    email: req.body.email.toLowerCase(),
+    phone: req.body.phone,
+  }).exec((err, prereg) => {
+    if (err) {
+      res.status(500).send({ message: "Something went wrong" });
+      return;
+    }
+    if (prereg.phoneConfirmNumber === req.body.code) {
+      prereg.confirmedPhone = true;
+      prereg.save();
+      res.status(200).send({ _id: prereg._id });
+    } else {
+      res.status(401).send({ message: t("prereg.invalid-email") });
+    }
+  });
+};
+
+exports.resendPhoneCode = (req, res) => {
+  const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+  if (res.locals.emailExists) {
+    PreReg.findOne({
+      email: req.body.email.toLowerCase(),
+      phone: req.body.phone,
+    }).exec(async (err, prereg) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      if (prereg) {
+        prereg.phoneConfirmNumber = number;
+        prereg.resentPhoneDate = Date.now();
+        prereg.save();
+        await sendPhoneConfirmation(req, number);
+        res.status(200).send({ message: "Resent!" });
+      }
+    });
   } else {
     res.status(404).send({ message: "Email not found" });
   }
@@ -446,7 +452,7 @@ exports.updateImage = (req, res) => {
 };
 
 exports.sendForgetEmail = (req, res) => {
-  User.findOne({ email: req.body.email }).exec((err, user) => {
+  User.findOne({ email: req.body.email.toLowerCase() }).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
       return;
@@ -456,44 +462,48 @@ exports.sendForgetEmail = (req, res) => {
       return;
     }
     const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
-    PreReg.findOne({ email: req.body.email }).exec((err, prereg) => {
-      if (err) {
-        res.status(500).send({ message: err });
-        return;
+    PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
+      (err, prereg) => {
+        if (err) {
+          res.status(500).send({ message: err });
+          return;
+        }
+        var preReg;
+        if (!prereg) {
+          preReg = new PreReg({
+            confirmedEmail: false,
+            emailConfirmNumber: number,
+            email: req.body.email.toLowerCase(),
+          });
+        } else {
+          preReg = prereg;
+          preReg.confirmedEmail = false;
+          preReg.emailConfirmNumber = number;
+        }
+        preReg.save();
+        sendForgotPasswordEmail(req.body.email, number);
+        res.status(200).send();
       }
-      var preReg;
-      if (!prereg) {
-        preReg = new PreReg({
-          confirmedEmail: false,
-          emailConfirmNumber: number,
-          email: req.body.email,
-        });
-      } else {
-        preReg = prereg;
-        preReg.confirmedEmail = false;
-        preReg.emailConfirmNumber = number;
-      }
-      preReg.save();
-      sendForgotPasswordEmail(req.body.email, number);
-      res.status(200).send();
-    });
+    );
   });
 };
 
 exports.resendForgotPassword = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
   if (res.locals.emailExists) {
-    PreReg.findOne({ email: req.body.email }).exec((err, prereg) => {
-      if (err) {
-        res.status(500).send({ message: "Something went wrong" });
-        return;
+    PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
+      (err, prereg) => {
+        if (err) {
+          res.status(500).send({ message: "Something went wrong" });
+          return;
+        }
+        prereg.emailConfirmNumber = number;
+        prereg.resentEmailDate = Date.now();
+        prereg.save();
+        sendForgotPasswordEmail(req.body.email, number);
+        res.status(200).send({ message: "Resent!" });
       }
-      prereg.emailConfirmNumber = number;
-      prereg.resentEmailDate = Date.now();
-      prereg.save();
-      sendForgotPasswordEmail(req.body.email, number);
-      res.status(200).send({ message: "Resent!" });
-    });
+    );
   } else {
     res.status(404).send({ message: "Email not found" });
   }
@@ -501,24 +511,26 @@ exports.resendForgotPassword = (req, res) => {
 
 exports.sendForgotCode = (req, res) => {
   const t = i18n(req.headers["accept-language"]);
-  PreReg.findOne({ email: req.body.email }).exec((err, prereg) => {
-    if (err) {
-      res.status(500).send({ message: "Something went wrong" });
-      return;
+  PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
+    (err, prereg) => {
+      if (err) {
+        res.status(500).send({ message: "Something went wrong" });
+        return;
+      }
+      if (prereg.emailConfirmNumber === req.body.code) {
+        prereg.confirmedEmail = true;
+        prereg.save();
+        res.status(200).send({ message: "Code Confirmed" });
+      } else {
+        res.status(401).send({ message: t("prereg.invalid-email") });
+      }
     }
-    if (prereg.emailConfirmNumber === req.body.code) {
-      prereg.confirmedEmail = true;
-      prereg.save();
-      res.status(200).send({ message: "Code Confirmed" });
-    } else {
-      res.status(401).send({ message: t("prereg.invalid-email") });
-    }
-  });
+  );
 };
 
 exports.sendResetPassword = (req, res) => {
   if (res.locals.emailConfirmed) {
-    User.findOne({ email: req.body.email }).exec((err, user) => {
+    User.findOne({ email: req.body.email.toLowerCase() }).exec((err, user) => {
       if (err) {
         res.status(500).send({ message: "Something went wrong" });
         return;

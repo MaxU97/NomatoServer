@@ -12,10 +12,10 @@ module.exports = [
   },
   {
     name: "autoCancelBooking",
-    interval: "every 10 seconds",
+    interval: "at 12:00am",
     worker: {
       workerData: {
-        description: "checks and deletes expired bookings for owners",
+        description: "checks and deletes expired bookings at midnight",
       },
     },
   },

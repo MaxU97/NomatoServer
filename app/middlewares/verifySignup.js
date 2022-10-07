@@ -4,7 +4,7 @@ const PreReg = db.preregdetails;
 
 checkDuplicateEmail = (req, res, next) => {
   User.findOne({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
   }).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -20,7 +20,7 @@ checkDuplicateEmail = (req, res, next) => {
 
 checkPreRegEmail = (req, res, next) => {
   PreReg.findOne({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
   }).exec((err, prereg) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -37,7 +37,7 @@ checkPreRegEmail = (req, res, next) => {
 
 checkEmailConfirmed = (req, res, next) => {
   PreReg.findOneAndDelete({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
   }).exec((err, prereg) => {
     if (prereg) {
       if (err) {
@@ -78,7 +78,7 @@ checkDuplicatePhone = (req, res, next) => {
 
 checkEmailTimeout = (req, res, next) => {
   PreReg.findOne({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
   }).exec((err, prereg) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -101,7 +101,7 @@ checkEmailTimeout = (req, res, next) => {
 
 checkPhoneTimeout = (req, res, next) => {
   PreReg.findOne({
-    email: req.body.email,
+    email: req.body.email.toLowerCase(),
     phone: req.body.phone,
   }).exec((err, prereg) => {
     if (err) {

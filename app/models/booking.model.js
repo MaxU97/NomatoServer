@@ -24,6 +24,7 @@ const Booking = mongoose.model(
     status: String,
     piid: String,
     intentID: String,
+    chargeID: String,
     created: Date,
   })
 );

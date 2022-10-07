@@ -71,6 +71,11 @@ module.exports = function (app) {
   );
 
   app.post(
+    "/api/booking/checkApprovedBookings",
+    [authJwt.verifyInOp],
+    controller.checkApprovedBookings
+  );
+  app.post(
     "/api/booking/checkBookings",
     [authJwt.verifyInOp],
     controller.checkExpiredBookings
