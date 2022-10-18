@@ -8,6 +8,7 @@ const fs = require("fs");
 const { ObjectId } = require("mongodb");
 const i18n = require("../../locales/i18n");
 const getDiscriminatorByValue = require("mongoose/lib/helpers/discriminator/getDiscriminatorByValue");
+const path = require("path");
 
 exports.upload = (req, res) => {
   const news = new News({
@@ -63,7 +64,7 @@ exports.update = (req, res) => {
             console.log("File deleted!");
           }
         );
-        doc.image = req.files[0];
+        doc.image = req.files[0].filename;
         changed = true;
       }
 
