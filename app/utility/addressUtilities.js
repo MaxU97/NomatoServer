@@ -1,5 +1,13 @@
 exports.parseAddressFull = (address) => {
-  return address[0].formatted_address;
+  return (
+    address.street_name +
+    ", " +
+    address.house_number +
+    ", " +
+    address.city +
+    ", " +
+    address.postcode
+  );
 };
 
 exports.addressType = {

@@ -5,6 +5,9 @@ const User = db.user;
 const i18n = require("../../locales/i18n");
 
 exports.updateProfile = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({
     _id: mongoose.Types.ObjectId(req.userId),
   }).exec((err, user) => {
@@ -13,7 +16,7 @@ exports.updateProfile = (req, res) => {
       return;
     }
     if (!user) {
-      return res.status(404).send({ message: "User Not found." });
+      return res.status(404).send({ message: t("auth.user-not-found") });
     }
     user.profileImage = req.file.filename;
     user.save((err, user) => {
@@ -26,7 +29,7 @@ exports.updateProfile = (req, res) => {
         return;
       } else {
         res.status(200).send({
-          message: "Image Reset",
+          message: { message: t("auth.image-reset") },
           image: user.profileImage,
         });
       }

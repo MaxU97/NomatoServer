@@ -62,6 +62,11 @@ module.exports = function (app, uploadProfilePicture) {
     controller.updateUser
   );
   app.patch(
+    "/api/auth/patchAddress",
+    [authJwt.verifyToken],
+    controller.updateAddress
+  );
+  app.patch(
     "/api/auth/patchImage",
     [authJwt.verifyToken],
     uploadProfilePicture.single("image"),

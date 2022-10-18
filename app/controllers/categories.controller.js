@@ -14,7 +14,7 @@ exports.getCategories = (req, res) => {
       res.status(200).send(results);
     });
 };
-
+const i18n = require("../../locales/i18n");
 const getSubcategories = async (subcats) => {
   var promises = [];
   var subPromises = [];
@@ -43,6 +43,9 @@ const getSubcategories = async (subcats) => {
 };
 
 exports.createCategory = async (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   try {
     const category = req.body;
 
@@ -99,7 +102,7 @@ exports.createCategory = async (req, res) => {
       });
     } else {
       if (!req.file) {
-        res.status(500).send({ message: "Please attach an image" });
+        res.status(500).send({ message: t("categories.attach-image") });
         return;
       }
       //adding new one
@@ -141,7 +144,9 @@ exports.createCategory = async (req, res) => {
 
 exports.checkExisting = async (req, res) => {
   let promises = [];
-
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   promises.push(
     Category.findOne({
       titleRU: req.body["titleRU"],
@@ -169,18 +174,21 @@ exports.checkExisting = async (req, res) => {
       }
     });
     if (exists) {
-      res.status(400).send({ message: "Exists" });
+      res.status(400).send({ message: t("categories.exists") });
     } else {
-      res.status(200).send({ message: "Available" });
+      res.status(200).send({ message: t("categories.available") });
     }
   });
 };
 
 exports.deleteCategory = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Category.deleteOne({ _id: mongoose.Types.ObjectId(req.body._id) }).exec(
     (err, del) => {
       if (err) {
-        res.status(500).send({ message: "Something Went Wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       Category.find()
@@ -193,12 +201,15 @@ exports.deleteCategory = (req, res) => {
 };
 
 exports.checkCategoryDependancies = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Item.findOne({ category: mongoose.Types.ObjectId(req.body._id) }).exec(
     (err, item) => {
       if (item) {
-        res.status(200).send({ message: "Dependancies Exist" });
+        res.status(200).send({ message: t("categories.depends-exist") });
       } else {
-        res.status(404).send({ message: "No dependancies" });
+        res.status(404).send({ message: t("categories.depends-no") });
       }
     }
   );

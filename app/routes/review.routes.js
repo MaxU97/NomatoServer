@@ -10,10 +10,5 @@ module.exports = function (app) {
     );
     next();
   });
-  app.post(
-    "/api/reviews/create",
-    [authJwt.verifyToken],
-    controller.createReview
-  );
   app.get("/api/reviews/getReviews", controller.getReviews);
 };

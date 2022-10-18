@@ -9,17 +9,97 @@
     "booking-not-found": "Booking not found or doesn't need approval"
   },
   "error": "Something Went Wrong",
+  "error-again": "Something went wrong, please try again",
   "prereg": {
-    "invalid-email": "Code Invalid"
+    "invalid-email": "Code Invalid",
+    "email-phone-not-found": "Email and Phone combination not found",
+    "email-confirmed": "Email Confirmed"
+  },
+  "reg": {
+    "email-used": "Email is already in use!",
+    "pw-reset-restart": "Please restart password reset. Something went wrong",
+    "phone-used": "Phone is already in use!",
+    "code-wait": "You need to wait before requesting a code again",
+    "not-found": "Not Found"
+  },
+  "auth": {
+    "re-sent": "Re-sent",
+    "email-not-found": "Email not found",
+    "code-confirmed": "Code Confirmed",
+    "password-changed": "Password Changed!",
+    "unauth": "Unauthorized",
+    "user-not-found": "User not found",
+    "fill-all": "Please submit all details",
+    "image-reset": "Image reset",
+    "bank-linked": "Your bank account has been linked",
+    "address-street-number": "Please make sure you choose an address that has a street number",
+    "captcha-failed": "ReCaptcha Failed",
+    "no-token": "No token provided",
+    "req-admin": "Require Admin Role!",
+    "no-profile": "Your profile is not complete",
+    "no-old-pw": "You must enter the old password",
+    "new-is-old-pw": "The new password must be different to the old password",
+    "old-pw-wrong": "The old password is wrong"
   },
   "user-update": {
     "phone-err": "Phone can only be updated once every 30 days",
     "address-err": "Address can only be updated once every 30 days",
+    "address-updated": "Address Updated",
     "update-success": "Update Successful",
     "nothing-changed": "Nothing was changed",
     "update-success2": "Please note:",
-    "image-success": "Profile Image Updated"
+    "image-success": "Profile Image Updated",
+    "error": "Something Went Wrong"
   },
-
+  "booking": {
+    "after-12-error": "You cannot make a booking on the same day after 12",
+    "no-booking-today": "You cannot make a booking before today",
+    "request-sent-owner": "Request sent to owner",
+    "booked-dates": "You are not allowed to book dates that are already booked",
+    "half-refund": "Booking Cancelled, half refunded",
+    "none-refund": "Booking Cancelled, nothing refunded",
+    "all-refund": "Booking Cancelled, Refunded All",
+    "canceled": "Booking Cancelled",
+    "refused": "Booking Refused",
+    "approved": "Booking Approved",
+    "wrong-type": "Wrong type submitted",
+    "item-not-found": "Item not found"
+  },
+  "categories": {
+    "attach-image": "Please attach an image",
+    "exists": "Exists",
+    "available": "Available",
+    "depends-exist": "Dependancies Exist",
+    "depends-no": "No dependancies"
+  },
+  "finance": {
+    "no-funds": "You do not have enough settled funds",
+    "widthdrawn": "Funds widthdrawn",
+    "no-bank": "You need to link a bank account to withdraw funds"
+  },
+  "items": {
+    "listed": "Item has been listed",
+    "no-exist": "Item does not exist",
+    "cant-edit-process": "Items cannot be edited if there are any bookings waiting for approval, or they have been rented before",
+    "cant-delete-process": "Items cannot be deleted if there are any bookings waiting for approval, or any active rentals",
+    "cant-hide-process": "Items cannot be hidden if there are any bookings waiting for approval or are currently being rented",
+    "updated": "Item has been updated",
+    "not-auth": "You are not authorised to do this",
+    "not-found-deleted": "Item not found or already deleted",
+    "deleted": "Item deleted",
+    "hidden": "Item is now hidden",
+    "visible": "Item is now visible",
+    "error-refresh": "Something went wrong, please refresh the page",
+    "no-view": "Not allowed to view",
+    "no-booking": "Booking does not exist",
+    "select-rating": "Please select a rating",
+    "reviewed": "Already reviewed",
+    "review-submit": "Your review was submitted, thanks!"
+  },
+  "review": {
+    "created": "Review Created",
+    "not-found": "Not Found"
+  },
+  "email-not-exist": "User with such email does not exist!",
   "phone-message": "Here is your activation code for your new profile:"
 }

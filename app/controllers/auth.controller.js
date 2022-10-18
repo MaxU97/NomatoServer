@@ -54,7 +54,9 @@ exports.signup = async (req, res) => {
 };
 
 exports.signin = async (req, res) => {
-  const t = i18n(req.headers["accept-language"]);
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({
     email: req.body.email.toLowerCase(),
   }).exec((err, user) => {
@@ -148,16 +150,12 @@ exports.preRegPhone = (req, res) => {
             await sendPhoneConfirmation(req, number);
             res.send({ phone: prereg.phone });
           } catch (err) {
-            res
-              .status(500)
-              .sendMessage("Something went wrong, please try again");
+            res.status(500).send({ message: t("error-again") });
           }
         }
       });
     } else {
-      res
-        .status(404)
-        .send({ message: "Email and Phone combination not found" });
+      res.status(404).send({ message: t("email-phone-not-found") });
     }
   });
 };
@@ -165,7 +163,7 @@ exports.preRegPhone = (req, res) => {
 const sendPhoneConfirmation = async (req, code) => {
   // // http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
   // var axios = require("axios");
-  // const t = i18n(req.headers["accept-language"]);
+  // const t = i18n(req.headers["accept-language"] ? req.headers["accept-language"] : "en");
   // const text = t("phone-message") + " " + code;
   // const sender = "NomaTo";
   // const api = process.env.SMS_API;
@@ -176,7 +174,7 @@ const sendPhoneConfirmation = async (req, code) => {
   //   .then((res) => {
   //     console.log(res);
   //     if (res.data < 100) {
-  //       throw "Something went wrong";
+  //       throw t("error");
   //     }
   //   })
   //   .catch((error) => {
@@ -185,17 +183,19 @@ const sendPhoneConfirmation = async (req, code) => {
 };
 
 exports.confirmEmail = (req, res) => {
-  const t = i18n(req.headers["accept-language"]);
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
     (err, prereg) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (prereg.emailConfirmNumber === req.body.code) {
         prereg.confirmedEmail = true;
         prereg.save();
-        res.status(200).send({ message: "Email Confirmed" });
+        res.status(200).send({ message: t("prereg.email-confirmed") });
       } else {
         res.status(401).send({ message: t("prereg.invalid-email") });
       }
@@ -205,33 +205,38 @@ exports.confirmEmail = (req, res) => {
 
 exports.resendEmailCode = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (res.locals.emailExists) {
     PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
       (err, prereg) => {
         if (err) {
-          res.status(500).send({ message: "Something went wrong" });
+          res.status(500).send({ message: t("error") });
           return;
         }
         prereg.emailConfirmNumber = number;
         prereg.resentEmailDate = Date.now();
         prereg.save();
         sendEmailConfirmation(req.body.email, number);
-        res.status(200).send({ message: "Resent!" });
+        res.status(200).send({ message: t("auth.re-sent") });
       }
     );
   } else {
-    res.status(404).send({ message: "Email not found" });
+    res.status(404).send({ message: t("auth.email-not-found") });
   }
 };
 
 exports.confirmPhone = (req, res) => {
-  const t = i18n(req.headers["accept-language"]);
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOne({
     email: req.body.email.toLowerCase(),
     phone: req.body.phone,
   }).exec((err, prereg) => {
     if (err) {
-      res.status(500).send({ message: "Something went wrong" });
+      res.status(500).send({ message: t("error") });
       return;
     }
     if (prereg.phoneConfirmNumber === req.body.code) {
@@ -246,13 +251,16 @@ exports.confirmPhone = (req, res) => {
 
 exports.resendPhoneCode = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (res.locals.emailExists) {
     PreReg.findOne({
       email: req.body.email.toLowerCase(),
       phone: req.body.phone,
     }).exec(async (err, prereg) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (prereg) {
@@ -260,11 +268,11 @@ exports.resendPhoneCode = (req, res) => {
         prereg.resentPhoneDate = Date.now();
         prereg.save();
         await sendPhoneConfirmation(req, number);
-        res.status(200).send({ message: "Resent!" });
+        res.status(200).send({ message: t("auth.re-sent") });
       }
     });
   } else {
-    res.status(404).send({ message: "Email not found" });
+    res.status(404).send({ message: t("auth.email-not-found") });
   }
 };
 
@@ -280,7 +288,7 @@ exports.getSelf = (req, res) => {
       return;
     }
     if (!user) {
-      return res.status(404).send({ message: "User Not found." });
+      return res.status(404).send({ message: t("auth.user-not-found") });
     }
 
     const phoneDiff = differenceInCalendarDays(
@@ -304,7 +312,7 @@ exports.getSelf = (req, res) => {
 
     renewUser(user, res);
     var address = "";
-    if (user.address.length > 0) {
+    if (user.address) {
       address = parseAddressFull(user.address);
     }
 
@@ -335,7 +343,9 @@ exports.updateUser = (req, res) => {
       return;
     }
 
-    const t = i18n(req.headers["accept-language"]);
+    const t = i18n(
+      req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+    );
     var phoneError;
     var addressError;
     var updated = false;
@@ -362,26 +372,6 @@ exports.updateUser = (req, res) => {
         updated = true;
       }
     }
-    if (req.body.latlng) {
-      if (!_.isEqual(user.address[0], req.body.address)) {
-        user.address = req.body.address;
-        if (
-          !parseAddressSpecific(
-            req.body.address.address_components,
-            addressType.number
-          )
-        ) {
-          res.status(500).send({
-            message:
-              "Please make sure you choose an address that has a street number",
-          });
-          return;
-        }
-        user.addressLatLng = req.body.latlng;
-        updated = true;
-      }
-    }
-
     user.save();
 
     if (updated) {
@@ -411,7 +401,7 @@ exports.updateUser = (req, res) => {
     }
 
     const address = parseAddressFull(user.address);
-    response = {
+    const response = {
       id: user._id,
       name: user.name,
       surname: user.surname,
@@ -431,6 +421,74 @@ exports.updateUser = (req, res) => {
   });
 };
 
+exports.updateAddress = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+
+  const houseNumberRE = /^([0-9]+[a-z]?)([\/][0-9]+)*$/;
+  if (!houseNumberRE.test(req.body.house_number)) {
+    res.status(400).send({ message: t("user-update.error") });
+    return;
+  }
+
+  if (!req.body.street_name) {
+    res.status(400).send({ message: t("user-update.error") });
+    return;
+  }
+
+  if (!req.body.city) {
+    res.status(400).send({ message: t("user-update.error") });
+    return;
+  }
+
+  if (!req.body.country) {
+    res.status(400).send({ message: t("user-update.error") });
+    return;
+  }
+
+  const postcodeRE = /^(LV-)[0-9]{4}$/;
+  if (!postcodeRE.test(req.body.postcode)) {
+    res.status(400).send({ message: t("user-update.error") });
+    return;
+  }
+  User.findOne({
+    _id: mongoose.Types.ObjectId(req.userId),
+  }).exec(async (err, user) => {
+    var updated = false;
+    if (err) {
+      res.status(500).send({ message: err });
+      return;
+    }
+
+    if (!_.isEqual(user.address, req.body)) {
+      updated = true;
+      user.address = req.body;
+      user.save();
+    }
+
+    var message;
+    if (updated) {
+      message = {
+        message: t("user-update.address-updated"),
+        changed: updated,
+      };
+    } else {
+      message = {
+        message: t("user-update.nothing-changed"),
+        changed: updated,
+      };
+    }
+
+    const address = parseAddressFull(user.address);
+    const response = {
+      address: address,
+      message: message,
+    };
+    res.status(200).send(response);
+  });
+};
+
 exports.updateImage = (req, res) => {
   User.findOne({
     _id: mongoose.Types.ObjectId(req.userId),
@@ -439,7 +497,9 @@ exports.updateImage = (req, res) => {
       res.status(500).send({ message: err });
       return;
     }
-    const t = i18n(req.headers["accept-language"]);
+    const t = i18n(
+      req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+    );
     user.profileImage = "ProfilePictures/" + req.file.filename;
     user.save();
 
@@ -452,13 +512,16 @@ exports.updateImage = (req, res) => {
 };
 
 exports.sendForgetEmail = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({ email: req.body.email.toLowerCase() }).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
       return;
     }
     if (!user) {
-      res.status(404).send({ message: "User with such email does not exist!" });
+      res.status(404).send({ message: t("user-update") });
       return;
     }
     const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
@@ -490,37 +553,42 @@ exports.sendForgetEmail = (req, res) => {
 
 exports.resendForgotPassword = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (res.locals.emailExists) {
     PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
       (err, prereg) => {
         if (err) {
-          res.status(500).send({ message: "Something went wrong" });
+          res.status(500).send({ message: t("error") });
           return;
         }
         prereg.emailConfirmNumber = number;
         prereg.resentEmailDate = Date.now();
         prereg.save();
         sendForgotPasswordEmail(req.body.email, number);
-        res.status(200).send({ message: "Resent!" });
+        res.status(200).send({ message: t("auth.re-sent") });
       }
     );
   } else {
-    res.status(404).send({ message: "Email not found" });
+    res.status(404).send({ message: t("auth.email-not-found") });
   }
 };
 
 exports.sendForgotCode = (req, res) => {
-  const t = i18n(req.headers["accept-language"]);
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOne({ email: req.body.email.toLowerCase() }).exec(
     (err, prereg) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (prereg.emailConfirmNumber === req.body.code) {
         prereg.confirmedEmail = true;
         prereg.save();
-        res.status(200).send({ message: "Code Confirmed" });
+        res.status(200).send({ message: t("auth.code-confirmed") });
       } else {
         res.status(401).send({ message: t("prereg.invalid-email") });
       }
@@ -529,44 +597,53 @@ exports.sendForgotCode = (req, res) => {
 };
 
 exports.sendResetPassword = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (res.locals.emailConfirmed) {
     User.findOne({ email: req.body.email.toLowerCase() }).exec((err, user) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       user.password = bcrypt.hashSync(req.body.password, 8);
       user.save();
-      res.status(200).send({ message: "Password Changed!" });
+      res.status(200).send({ message: t("auth.password-changed") });
     });
   } else {
-    res.status(400).send({ message: "Unauthorized" });
+    res.status(400).send({ message: t("error.unauth") });
   }
 };
 
 exports.sendChangePassword = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
     (err, user) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       user.password = bcrypt.hashSync(req.body.password, 8);
       user.save();
-      res.status(200).send({ message: "Password Changed!" });
+      res.status(200).send({ message: t("auth.password-changed") });
     }
   );
 };
 
 exports.userBalance = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
     async (err, user) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (!user) {
-        res.status(404).send({ message: "User not found" });
+        res.status(404).send({ message: t("auth.user-not-found") });
         return;
       }
       try {
@@ -585,7 +662,7 @@ exports.userBalance = (req, res) => {
           });
         }
       } catch (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
     }
@@ -593,47 +670,28 @@ exports.userBalance = (req, res) => {
 };
 
 exports.createStripeAccount = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
     async (err, user) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (!user) {
-        res.status(404).send({ message: "User not found" });
+        res.status(404).send({ message: t("auth.user-not-found") });
         return;
       }
       if (!req.body.name || !req.body.surname || !req.body.iban) {
-        res.status(404).send({ message: "Please submit all details" });
+        res.status(404).send({ message: t("auth.fill-all") });
         return;
       }
 
       const address = {
-        line1:
-          parseAddressSpecific(
-            user.address[0].address_components,
-            addressType.number
-          ) +
-          ", " +
-          parseAddressSpecific(
-            user.address[0].address_components,
-            addressType.road
-          ) +
-          ", " +
-          parseAddressSpecific(
-            user.address[0].address_components,
-            addressType.sublocality
-          ),
-        postal_code:
-          "LV-" +
-          parseAddressSpecific(
-            user.address[0].address_components,
-            addressType.postCode
-          ),
-        city: parseAddressSpecific(
-          user.address[0].address_components,
-          addressType.locality
-        ),
+        line1: user.address.house_number + ", " + user.address.street_name,
+        postal_code: user.address.postal_code,
+        city: user.address.city,
       };
 
       if (!user.customerID) {
@@ -679,8 +737,6 @@ exports.createStripeAccount = (req, res) => {
       }
 
       //TODO UPDATE EMAIL AND ADDRESS ON CHANGE
-      //TODO ADD A CHECK IF ADDRESS CONTAINS POSTALCODE
-      //TODO REPLACE THE DEFAULT EXTERNAL ACCOUNT
       try {
         const token = await stripe.tokens.create({
           bank_account: {
@@ -698,9 +754,7 @@ exports.createStripeAccount = (req, res) => {
             default_for_currency: true,
           })
           .then(async (response) => {
-            res
-              .status(200)
-              .send({ message: "Your bank account has been linked" });
+            res.status(200).send({ message: t("auth.bank-linked") });
           });
       } catch (err) {
         res.status(err.statusCode).send({ message: err.message });

@@ -12,8 +12,11 @@ const {
   getNaturalFromLongLat,
 } = require("../utility/addressUtilities");
 const { getDaysBetween, filterDates } = require("../utility/datesUtilities");
-
+const i18n = require("../../locales/i18n");
 exports.upload = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   const detectedLanguage = checkLanguage(req.body.description);
   let images = [];
   req.files.forEach((image) => {
@@ -71,11 +74,14 @@ exports.upload = (req, res) => {
     item.tagCloud = tags;
     item.save();
     console.log(req.body);
-    res.status(200).send({ message: "Item has been listed" });
+    res.status(200).send({ message: t("items.listed") });
   });
 };
 
 exports.get = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   try {
     let id = mongoose.Types.ObjectId(req.body.id);
     Item.findOne({ _id: id, status: { $nin: ["deleted"] } })
@@ -84,16 +90,16 @@ exports.get = (req, res) => {
       .populate("subcat")
       .exec((err, item) => {
         if (!item) {
-          res.status(404).send({ message: "Item does not exist" });
+          res.status(404).send({ message: t("items.no-exist") });
           return;
         }
         if (item.status === "hidden") {
           if (!req.userId) {
-            res.status(401).send({ message: "Item does not exist" });
+            res.status(401).send({ message: t("items.no-exist") });
             return;
           } else {
             if (!(req.userId == item.user._id || req.isAdmin)) {
-              res.status(401).send({ message: "Item does not exist" });
+              res.status(401).send({ message: t("items.no-exist") });
               return;
             }
           }
@@ -393,15 +399,18 @@ const generateTags = (title, description, category, subcat) => {
 };
 
 exports.update = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemId) })
     .populate("user")
     .exec((err, item) => {
       if (err) {
-        res.status(400).send({ message: "Something went wrong" });
+        res.status(400).send({ message: t("error") });
         return;
       }
       if (!item) {
-        res.status(400).send({ message: "item not found" });
+        res.status(400).send({ message: t("items.no-exist") });
         return;
       }
       Booking.find({
@@ -412,8 +421,7 @@ exports.update = (req, res) => {
       }).exec((err, bookings) => {
         if (bookings.length > 0) {
           res.status(403).send({
-            message:
-              "Items cannot be edited if there are any bookings waiting for approval, or they have been rented before",
+            message: t("items.cant-edit-process"),
           });
           return;
         } else {
@@ -473,7 +481,7 @@ exports.update = (req, res) => {
               item.tagCloud = tags;
               item.save();
               console.log(req.body);
-              res.status(200).send({ message: "Item has been updated" });
+              res.status(200).send({ message: t("items.updated") });
 
               oldImages.forEach((image) => {
                 fs.unlink(
@@ -487,9 +495,7 @@ exports.update = (req, res) => {
               });
             });
           } else {
-            res
-              .status(401)
-              .send({ message: "You are not authorised to do this" });
+            res.status(401).send({ message: t("items.not-auth") });
           }
         }
       });
@@ -497,6 +503,9 @@ exports.update = (req, res) => {
 };
 
 exports.delete = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Item.findOne({
     _id: mongoose.Types.ObjectId(req.body.id),
     status: { $nin: ["deleted"] },
@@ -504,15 +513,15 @@ exports.delete = (req, res) => {
     .populate("user")
     .exec((err, item) => {
       if (err) {
-        res.status(400).send({ message: "Something went wrong" });
+        res.status(400).send({ message: t("error") });
         return;
       }
       if (!item) {
-        res.status(400).send({ message: "Item not found or already deleted" });
+        res.status(400).send({ message: t("items.not-found-deleted") });
         return;
       }
       if (!(item.user._id == req.userId || req.isAdmin)) {
-        res.status(403).send({ message: "Not Authorized" });
+        res.status(403).send({ message: t("items.not-auth") });
         return;
       }
       Booking.find({
@@ -524,14 +533,13 @@ exports.delete = (req, res) => {
         if (bookings) {
           if (bookings.length > 0) {
             res.status(403).send({
-              message:
-                "Items cannot be deleted if there are any bookings waiting for approval, or any active rentals",
+              message: t("items.cant-delete-process"),
             });
             return;
           } else {
             item.status = "deleted";
             item.save();
-            res.status(200).send({ message: "Item has been deleted" });
+            res.status(200).send({ message: t("items.deleted") });
           }
         }
       });
@@ -539,6 +547,9 @@ exports.delete = (req, res) => {
 };
 
 exports.toggleVisibility = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Item.findOne({
     _id: mongoose.Types.ObjectId(req.body.id),
     status: { $nin: ["deleted"] },
@@ -546,15 +557,15 @@ exports.toggleVisibility = (req, res) => {
     .populate("user")
     .exec((err, item) => {
       if (err) {
-        res.status(400).send({ message: "Something went wrong" });
+        res.status(400).send({ message: t("error") });
         return;
       }
       if (!item) {
-        res.status(404).send({ message: "Item not found" });
+        res.status(404).send({ message: t("items.no-exist") });
         return;
       }
       if (!(item.user._id == req.userId || req.isAdmin)) {
-        res.status(403).send({ message: "Not Authorized" });
+        res.status(403).send({ message: t("items.not-auth") });
         return;
       }
       Booking.find({
@@ -566,18 +577,17 @@ exports.toggleVisibility = (req, res) => {
         if (bookings) {
           if (bookings.length > 0) {
             res.status(403).send({
-              message:
-                "Items cannot be hidden if there are any bookings waiting for approval or are currently being rented",
+              message: t("items.cant-hide-process"),
             });
             return;
           } else {
             var response;
             if (item.status == "hidden") {
               item.status = "exists";
-              response = "Item is now visible";
+              response = t("items.visible");
             } else {
               item.status = "hidden";
-              response = "Item is now hidden";
+              response = t("items.hidden");
             }
             item.save();
             res.status(200).send({
@@ -590,6 +600,9 @@ exports.toggleVisibility = (req, res) => {
 };
 
 exports.getSelf = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Item.find(
     {
       user: mongoose.Types.ObjectId(req.userId),
@@ -603,13 +616,11 @@ exports.getSelf = (req, res) => {
     }
   ).exec((err, items) => {
     if (err) {
-      res
-        .status(400)
-        .send({ message: "Something went wrong, please refresh the page" });
+      res.status(400).send({ message: t("items.error-refresh") });
       return;
     }
     if (!items) {
-      res.status(401).send({ message: "Not allowed to view" });
+      res.status(401).send({ message: t("items.no-view") });
       return;
     }
     var returnArray = [];
@@ -627,57 +638,69 @@ exports.getSelf = (req, res) => {
 };
 
 exports.getForReview = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.findOne({
     _id: mongoose.Types.ObjectId(req.query.id),
     userID: mongoose.Types.ObjectId(req.userId),
   })
-    .populate({ path: "itemID", select: { title: 1, _id: 0 } })
+    .populate({ path: "itemID", select: { title: 1, images: 1, _id: 0 } })
+    .populate({ path: "ownerID" })
     .exec((err, booking) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (!booking) {
-        res.status(500).send({ message: "Booking does not exist" });
+        res.status(500).send({ message: t("items.no-booking") });
         return;
       }
       if (booking.reviewed == undefined || booking.reviewed == null) {
-        res.status(500).send({ message: "Booking does not exist" });
+        res.status(500).send({ message: t("items.no-booking") });
         return;
       }
 
-      res
-        .status(200)
-        .send({ title: booking.itemID.title, reviewed: booking.reviewed });
+      res.status(200).send({
+        title: booking.itemID.title,
+        reviewed: booking.reviewed,
+        image: booking.itemID.images[0],
+        dateStart: booking.dateStart,
+        dateEnd: booking.dateEnd,
+        owner: booking.ownerID.name,
+      });
       return;
     });
 };
 
 exports.submitReview = (req, res) => {
-  if (!req.body.id || !req.body.review || !req.body.reviewType) {
-    res.status(500).send({ message: "Please fill all of the fields" });
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+  if (req.body.reviewType == null || req.body.reviewType == undefined) {
+    res.status(500).send({ message: t("items.select-rating") });
     return;
   }
   Booking.findOne({
     _id: mongoose.Types.ObjectId(req.body.id),
     userID: mongoose.Types.ObjectId(req.userId),
   })
-    .populate({ path: "itemID", select: { _id: 1 } })
+    .populate({ path: "itemID", select: { _id: 1, likes: 1, dislikes: 1 } })
     .exec((err, booking) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       if (!booking) {
-        res.status(500).send({ message: "Booking does not exist" });
+        res.status(500).send({ message: t("items.no-booking") });
         return;
       }
       if (booking.reviewed == undefined || booking.reviewed == null) {
-        res.status(500).send({ message: "Booking does not exist" });
+        res.status(500).send({ message: t("items.no-booking") });
         return;
       }
       if (booking.reviewed) {
-        res.status(500).send({ message: "Already reviewed" });
+        res.status(500).send({ message: t("items.reviewed") });
         return;
       }
 
@@ -688,9 +711,18 @@ exports.submitReview = (req, res) => {
         datePosted: Date.now(),
         type: req.body.reviewType ? "positive" : "negative",
       });
+
+      if (req.body.reviewType) {
+        booking.itemID.likes += 1;
+      } else {
+        booking.itemID.dislikes += 1;
+      }
+
       booking.reviewed = true;
+
+      booking.itemID.save();
       review.save();
       booking.save();
-      res.status(200).send({ message: "Your review was submitted, thanks!" });
+      res.status(200).send({ message: t("items.review-submit") });
     });
 };

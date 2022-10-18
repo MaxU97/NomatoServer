@@ -5,7 +5,6 @@ const User = db.user;
 const Item = db.item;
 const Finance = db.finance;
 const crypto = require("crypto");
-
 const stripe = require("stripe")(process.env.STRIPE_KEY);
 var differenceInCalendarDays = require("date-fns/differenceInCalendarDays");
 var differenceInHours = require("date-fns/differenceInHours");
@@ -30,6 +29,9 @@ exports.getServiceFee = (req, res) => {
 const { set, isAfter, isBefore, parseISO, isSameDay } = require("date-fns");
 
 exports.request = async (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   let price;
   var daySubmitted = set(parseISO(req.body.dateStart), {
     hours: 0,
@@ -53,14 +55,14 @@ exports.request = async (req, res) => {
   if (isAfter(Date.now(), date12Today)) {
     if (isSameDay(daySubmitted, Date.now())) {
       res.status(500).send({
-        message: "You cannot make a booking on the same day after 12",
+        message: t("booking.after-12-error"),
       });
       return;
     }
   } else {
     if (isBefore(daySubmitted, dayNow)) {
       res.status(500).send({
-        message: "You cannot make a booking before today",
+        message: t("booking.no-booking-today"),
       });
       return;
     }
@@ -129,8 +131,7 @@ exports.request = async (req, res) => {
           );
         } else {
           res.status(401).send({
-            message:
-              "You are not allowed to book dates that are already booked",
+            message: t("booking.booked-dates"),
           });
         }
       });
@@ -175,6 +176,9 @@ exports.recordBooking = (req, res) => {
 exports.sendBookingToOwner = (req, res) => {
   console.log(req.body);
 
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.findOne({
     piid: req.body.payment_intent,
     userID: mongoose.Types.ObjectId(req.userId),
@@ -183,11 +187,11 @@ exports.sendBookingToOwner = (req, res) => {
     .populate("itemID")
     .exec(async (err, booking) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       if (!booking) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       if (booking.status === "unfinished") {
@@ -195,7 +199,7 @@ exports.sendBookingToOwner = (req, res) => {
         booking.intentID = req.body.intentID;
         booking.created = Date.now();
       } else {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
 
@@ -204,11 +208,14 @@ exports.sendBookingToOwner = (req, res) => {
       });
       await sendRequestNotification(booking);
       booking.save();
-      res.status(200).send({ message: "Request sent to owner" });
+      res.status(200).send({ message: t("booking.request-sent-owner") });
     });
 };
 
 exports.getBookingHistory = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.find(
     {
       userID: mongoose.Types.ObjectId(req.userId),
@@ -235,15 +242,19 @@ exports.getBookingHistory = (req, res) => {
         descRU: 0,
       },
     })
+    .sort({ created: -1 })
     .exec((err, bookings) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
       }
       res.send({ bookingHistory: bookings });
     });
 };
 
 exports.getRequests = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.find(
     {
       ownerID: mongoose.Types.ObjectId(req.userId),
@@ -269,19 +280,23 @@ exports.getRequests = (req, res) => {
         descRU: 0,
       },
     })
+    .sort({ created: -1 })
     .populate({
       path: "userID",
       select: { _id: 1, name: 1, surname: 1, profileImage: 1 },
     })
     .exec((err, bookings) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
       }
       res.send({ bookingRequests: bookings });
     });
 };
 
 exports.cancelBooking = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.findOne({
     userID: mongoose.Types.ObjectId(req.userId),
     _id: mongoose.Types.ObjectId(req.body.booking_id),
@@ -291,11 +306,11 @@ exports.cancelBooking = (req, res) => {
     .populate("ownerID")
     .exec((err, booking) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       if (!booking) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
 
@@ -308,6 +323,9 @@ exports.cancelBooking = (req, res) => {
 };
 
 const cancelApprovedBooking = async (req, res, booking) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   const now = new Date(Date.now());
   const dayCount = differenceInCalendarDays(
     new Date(booking.dateEnd),
@@ -360,7 +378,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
         booking.status = "canceled";
         finance.save();
         booking.save();
-        res.status(200).send({ message: "Booking Cancelled, half refunded" });
+        res.status(200).send({ message: t("booking.half-refund") });
         return;
       } else if (hoursUntilBooking < 24) {
         await stripe.transfers.create({
@@ -381,9 +399,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
         finance.save();
         booking.status = "canceled";
         booking.save();
-        res
-          .status(200)
-          .send({ message: "Booking Cancelled, nothing refunded" });
+        res.status(200).send({ message: t("booking.none-refund") });
       } else {
         await stripe.refunds.create({
           payment_intent: booking.intentID,
@@ -392,34 +408,40 @@ const cancelApprovedBooking = async (req, res, booking) => {
         });
         booking.status = "canceled";
         booking.save();
-        res.status(200).send({ message: "Booking Cancelled, Refunded All" });
+        res.status(200).send({ message: t("booking.all-refund") });
       }
     } catch (err) {
-      res.status(500).send({ message: "Something went wrong" });
+      res.status(500).send({ message: t("error") });
     }
   });
 };
 
 const cancelOtherBooking = async (req, res, booking) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   try {
     const paymentIntent = await stripe.paymentIntents.cancel(booking.intentID);
     booking.status = "canceled";
     booking.save();
-    res.status(200).send({ message: "Booking Canceled" });
+    res.status(200).send({ message: t("booking.canceled") });
   } catch (err) {
     if (err.payment_intent) {
       if (err.payment_intent.status == "canceled") {
         booking.status = "canceled";
         booking.save();
-        res.status(200).send({ message: "Booking Canceled" });
+        res.status(200).send({ message: t("booking.canceled") });
         return;
       }
     }
-    res.status(500).send({ message: "Something went wrong" });
+    res.status(500).send({ message: t("error") });
   }
 };
 
 exports.refuseBooking = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.findOne({
     ownerID: mongoose.Types.ObjectId(req.userId),
     _id: mongoose.Types.ObjectId(req.body.booking_id),
@@ -429,11 +451,11 @@ exports.refuseBooking = (req, res) => {
     .populate("itemID")
     .exec(async (err, booking) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       if (!booking) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
 
@@ -442,11 +464,14 @@ exports.refuseBooking = (req, res) => {
       booking.refuseReason = req.body.reason;
       booking.save();
       await sendRefusalNotification(booking);
-      res.status(200).send({ message: "Booking Refused" });
+      res.status(200).send({ message: t("booking.refused") });
     });
 };
 
 exports.approveBooking = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.findOne({
     ownerID: mongoose.Types.ObjectId(req.userId),
     _id: mongoose.Types.ObjectId(req.body.booking_id),
@@ -457,11 +482,11 @@ exports.approveBooking = (req, res) => {
     .populate("itemID")
     .exec(async (err, booking) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       if (!booking) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       try {
@@ -472,15 +497,18 @@ exports.approveBooking = (req, res) => {
         booking.status = "approved";
         booking.save();
       } catch (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       await sendApprovalNotification(booking);
-      res.status(200).send({ message: "Booking Approved" });
+      res.status(200).send({ message: t("booking.approved") });
     });
 };
 
 exports.getApprovedUser = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   Booking.findOne({
     ownerID: mongoose.Types.ObjectId(req.userId),
     userID: mongoose.Types.ObjectId(req.body.userID),
@@ -490,11 +518,11 @@ exports.getApprovedUser = (req, res) => {
     .populate({ path: "userID", select: { number: 1, email: 1, _id: 0 } })
     .exec((err, booking) => {
       if (err) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
       if (!booking) {
-        res.status(404).send({ error: "Something Went Wrong" });
+        res.status(404).send({ error: t("error") });
         return;
       }
 
@@ -503,6 +531,9 @@ exports.getApprovedUser = (req, res) => {
 };
 
 exports.qrHash = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   var filter = {};
   if (req.body.type) {
     switch (req.body.type) {
@@ -522,7 +553,7 @@ exports.qrHash = (req, res) => {
         break;
     }
   } else {
-    res.status(403).send({ message: "Wrong type submitted" });
+    res.status(403).send({ message: t("booking.wrong-type") });
     return;
   }
 
@@ -584,7 +615,9 @@ const decrypt = (text) => {
 };
 
 exports.scanQR = (req, res) => {
-  const t = i18n(req.headers["accept-language"]);
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   const options = JSON.parse(decrypt(req.body.encryptedData));
   let ownerID;
   let userID;
@@ -609,7 +642,7 @@ exports.scanQR = (req, res) => {
         break;
     }
   } else {
-    res.status(403).send({ message: "Wrong type submitted" });
+    res.status(403).send({ message: t("booking.wrong-type") });
     return;
   }
 
@@ -669,6 +702,9 @@ exports.scanQR = (req, res) => {
 };
 
 exports.getAvailableQty = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   const { from, to } = req.body.dates;
   Item.findOne(
     { _id: mongoose.Types.ObjectId(req.body.itemID) },
@@ -681,7 +717,7 @@ exports.getAvailableQty = (req, res) => {
       return;
     }
     if (!item) {
-      res.status(404).send({ message: "Item Not Found" });
+      res.status(404).send({ message: t("booking.item-not-found") });
       return;
     }
     Booking.find(
@@ -808,5 +844,26 @@ exports.checkApprovedBookings = (req, res) => {
           console.log(err);
         }
       });
+    });
+};
+
+exports.checkReviewedBookings = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+  Booking.find({
+    userID: mongoose.Types.ObjectId(req.userId),
+    status: { $in: ["returned"] },
+    reviewed: false,
+  })
+    .limit(1)
+    .sort({ $natural: -1 })
+    .exec((err, booking) => {
+      if (booking.length) {
+        res.status(200).send({ review_pending: booking[0].id });
+        return;
+      } else {
+        res.status(200).send({ review_pending: false });
+      }
     });
 };

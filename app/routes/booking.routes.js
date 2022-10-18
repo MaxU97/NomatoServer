@@ -62,6 +62,12 @@ module.exports = function (app) {
 
   app.post("/api/booking/scanQR", [authJwt.verifyToken], controller.scanQR);
 
+  app.get(
+    "/api/booking/checkPendingReview",
+    [authJwt.verifyToken],
+    controller.checkReviewedBookings
+  );
+
   app.post("/api/booking/getQrHash", [authJwt.verifyToken], controller.qrHash);
 
   app.post(

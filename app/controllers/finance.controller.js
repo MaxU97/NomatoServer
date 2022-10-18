@@ -4,7 +4,7 @@ const Booking = db.booking;
 const Item = db.item;
 const User = db.user;
 const Finance = db.finance;
-
+const i18n = require("../../locales/i18n");
 var differenceInCalendarDays = require("date-fns/differenceInCalendarDays");
 var differenceInHours = require("date-fns/differenceInHours");
 const {
@@ -14,10 +14,13 @@ const {
 const stripe = require("stripe")(process.env.STRIPE_KEY);
 
 exports.withdraw = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({ _id: mongoose.Types.ObjectId(req.userId) }).exec(
     async (err, user) => {
       if (err) {
-        res.status(500).send("Something Went Wrong");
+        res.status(500).send(t("error"));
         return;
       }
       if (!user) {
@@ -30,9 +33,7 @@ exports.withdraw = (req, res) => {
           });
 
           if (account.available[0].amount < req.body.amount * 100) {
-            res
-              .status(403)
-              .send({ message: "You do not have enough settled funds" });
+            res.status(403).send({ message: t("finance.no-funds") });
             return;
           } else {
             try {
@@ -56,18 +57,18 @@ exports.withdraw = (req, res) => {
                 dateAdded: Date.now(),
               });
               finance.save();
-              res.status(200).send({ message: "Funds withdrawn" });
+              res.status(200).send({ message: t("finance.withdrawn") });
             } catch (err) {
               res.status(500).send({ message: err.message });
             }
           }
         } catch (err) {
-          res.status(500).send({ message: "Something went wrong" });
+          res.status(500).send({ message: t("error") });
           return;
         }
       } else {
         res.status(500).send({
-          message: "You need to link a bank account to withdraw funds",
+          message: t("finance.no-bank"),
         });
       }
     }

@@ -1,8 +1,11 @@
 const db = require("../models");
 const User = db.user;
 const PreReg = db.preregdetails;
-
+const i18n = require("../../locales/i18n");
 checkDuplicateEmail = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({
     email: req.body.email.toLowerCase(),
   }).exec((err, user) => {
@@ -11,7 +14,7 @@ checkDuplicateEmail = (req, res, next) => {
       return;
     }
     if (user) {
-      res.status(400).send({ message: "Email is already in use!" });
+      res.status(400).send({ message: t("reg.email-used") });
       return;
     }
     next();
@@ -36,6 +39,9 @@ checkPreRegEmail = (req, res, next) => {
 };
 
 checkEmailConfirmed = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOneAndDelete({
     email: req.body.email.toLowerCase(),
   }).exec((err, prereg) => {
@@ -51,7 +57,7 @@ checkEmailConfirmed = (req, res, next) => {
       }
     } else {
       res.status(401).send({
-        message: "Please restart password reset. Something went wrong",
+        message: t("reg.pw-reset-restart"),
       });
       return;
     }
@@ -61,6 +67,9 @@ checkEmailConfirmed = (req, res, next) => {
 };
 
 checkDuplicatePhone = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findOne({
     phone: req.body.phone,
   }).exec((err, user) => {
@@ -69,7 +78,7 @@ checkDuplicatePhone = (req, res, next) => {
       return;
     }
     if (user) {
-      res.status(400).send({ message: "Phone is already in use!" });
+      res.status(400).send({ message: t("reg.phone-used") });
       return;
     }
     next();
@@ -77,6 +86,9 @@ checkDuplicatePhone = (req, res, next) => {
 };
 
 checkEmailTimeout = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOne({
     email: req.body.email.toLowerCase(),
   }).exec((err, prereg) => {
@@ -87,9 +99,7 @@ checkEmailTimeout = (req, res, next) => {
     if (prereg.resentEmailDate) {
       timeout = Date.now() - prereg.resentEmailDate;
       if (timeout < 55000) {
-        res
-          .status(401)
-          .send({ message: "You need to wait before requesting a code again" });
+        res.status(401).send({ message: t("reg.code-wait") });
       } else {
         next();
       }
@@ -100,6 +110,9 @@ checkEmailTimeout = (req, res, next) => {
 };
 
 checkPhoneTimeout = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOne({
     email: req.body.email.toLowerCase(),
     phone: req.body.phone,
@@ -114,7 +127,7 @@ checkPhoneTimeout = (req, res, next) => {
         timeout = Date.now() - prereg.resentPhoneDate;
         if (timeout < 55000) {
           res.status(401).send({
-            message: "You need to wait before requesting a code again",
+            message: t("reg.code-wait"),
           });
         } else {
           res.locals.emailExists = true;
@@ -125,7 +138,7 @@ checkPhoneTimeout = (req, res, next) => {
         next();
       }
     } else {
-      res.status(404).send({ message: "Not Found" });
+      res.status(404).send({ message: t("reg.not-found") });
     }
   });
 };

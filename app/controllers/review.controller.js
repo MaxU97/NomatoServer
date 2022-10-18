@@ -2,25 +2,15 @@ const db = require("../models");
 const fs = require("fs");
 const path = require("path");
 const Review = db.review;
+const Item = db.item;
 const mongoose = require("mongoose");
-
-exports.createReview = (req, res) => {
-  const review = new Review({
-    userID: mongoose.Types.ObjectId(req.userId),
-    itemID: mongoose.Types.ObjectId(req.body.itemID),
-    language: "EN",
-    text: req.body.text,
-    datePosted: Date.now(),
-    type: req.body.type,
-  });
-
-  review.save();
-  res.status(200).send({ message: "Review created" });
-};
-
+const i18n = require("../../locales/i18n");
 exports.getReviews = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (!req.query.itemID) {
-    res.status(404).send({ message: "Not Found" });
+    res.status(404).send({ message: t("review.not-found") });
     return;
   }
 
@@ -35,7 +25,7 @@ exports.getReviews = (req, res) => {
     .sort({ _id: -1 })
     .exec((err, review) => {
       if (err) {
-        res.status(500).send({ message: "Something went wrong" });
+        res.status(500).send({ message: t("error") });
         return;
       }
       res.status(200).send({ reviews: review });

@@ -5,8 +5,11 @@ const User = db.user;
 const Role = db.role;
 var bcrypt = require("bcryptjs");
 const axios = require("axios");
-
+const i18n = require("../../locales/i18n");
 validateHuman = async (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (req.body.token) {
     const response = await axios
       .post(
@@ -17,7 +20,7 @@ validateHuman = async (req, res, next) => {
         if (data.success) {
           next();
         } else {
-          res.status(400).send({ message: "ReCaptcha Failed" });
+          res.status(400).send({ message: t("auth.captcha-failed") });
         }
       })
       .catch((err) => {
@@ -29,13 +32,16 @@ validateHuman = async (req, res, next) => {
 };
 
 verifyToken = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   let token = req.headers["x-access-token"];
   if (!token) {
-    return res.status(403).send({ message: "No token provided!" });
+    return res.status(403).send({ message: t("auth.no-token") });
   }
   jwt.verify(token, config.secret, (err, decoded) => {
     if (err) {
-      return res.status(401).send({ message: "Unauthorized!" });
+      return res.status(401).send({ message: t("auth.unauth") });
     }
     req.userId = decoded.id;
     next();
@@ -43,9 +49,12 @@ verifyToken = (req, res, next) => {
 };
 
 verifyInOp = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   let token = req.headers["x-access-token"];
   if (!token) {
-    return res.status(403).send({ message: "No token provided!" });
+    return res.status(403).send({ message: t("auth.no-token") });
   }
   if (token === process.env.AUTO_UPDATER_TOKEN) {
     next();
@@ -53,6 +62,9 @@ verifyInOp = (req, res, next) => {
 };
 
 isAdmin = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   User.findById(req.userId).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -62,7 +74,7 @@ isAdmin = (req, res, next) => {
       next();
       return;
     } else {
-      res.status(403).send({ message: "Require Admin Role!" });
+      res.status(403).send({ message: t("auth.req-admin") });
       return;
     }
   });
@@ -92,7 +104,7 @@ appendUser = (req, res, next) => {
   }
   jwt.verify(token, config.secret, (err, decoded) => {
     if (err) {
-      return res.status(401).send({ message: "Unauthorized!" });
+      return res.status(401).send({ message: t("auth.unauth") });
     }
     req.userId = decoded.id;
     next();
@@ -100,6 +112,9 @@ appendUser = (req, res, next) => {
 };
 
 isCompletedAccount = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (req.userId != null) {
     User.findById(req.userId).exec((err, user) => {
       if (err) {
@@ -109,7 +124,7 @@ isCompletedAccount = (req, res, next) => {
       if (user.completionStatus) {
         next();
       } else {
-        res.status(403).send({ message: "Your profile is not complete" });
+        res.status(403).send({ message: t("auth.no-profile") });
         return;
       }
     });
@@ -119,6 +134,9 @@ isCompletedAccount = (req, res, next) => {
 };
 
 verifyPassword = (req, res, next) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   if (req.userId != null) {
     User.findById(req.userId).exec((err, user) => {
       if (err) {
@@ -132,7 +150,7 @@ verifyPassword = (req, res, next) => {
           user.password
         );
       } else {
-        res.status(401).send({ message: "You must enter the old password" });
+        res.status(401).send({ message: t("auth.no-old-pw") });
         return;
       }
 
@@ -143,17 +161,17 @@ verifyPassword = (req, res, next) => {
 
         if (samePassword) {
           res.status(401).send({
-            message: "The new password must be different to the old password",
+            message: t("auth.new-is-old-pw"),
           });
           return;
         }
         next();
       } else {
-        res.status(401).send({ message: "The old password is wrong" });
+        res.status(401).send({ message: t("auth.old-pw-wrong") });
       }
     });
   } else {
-    res.status(401).send({ message: "Not Authorised" });
+    res.status(401).send({ message: t("auth.unauth") });
   }
 };
 const authJwt = {
