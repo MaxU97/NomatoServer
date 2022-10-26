@@ -100,6 +100,9 @@
     "created": "Review Created",
     "not-found": "Not Found"
   },
+  "support": {
+    "sent": "Message sent"
+  },
   "email-not-exist": "User with such email does not exist!",
   "phone-message": "Here is your activation code for your new profile:"
 }

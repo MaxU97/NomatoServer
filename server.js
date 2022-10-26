@@ -100,6 +100,7 @@ require("./app/routes/categories.routes")(app, uploadIcon);
 require("./app/routes/finance.routes")(app);
 require("./app/routes/review.routes")(app);
 require("./app/routes/webhook.routes")(app);
+require("./app/routes/utility.routes")(app);
 require("./app/services/scheduler/taskScheduler")();
 
 const PORT = process.env.PORT || 4000;
