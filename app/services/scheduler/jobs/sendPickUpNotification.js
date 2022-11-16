@@ -91,10 +91,6 @@ const sendPickUpNotification = async () => {
         });
     });
   });
-
-  console.log("");
-  // console.log("ENTERED SEND PICK UP NOTIFICATION");
-  // require("./mailer")(mailOptions);
 };
 
-sendPickUpNotification().catch((err) => console.log(err));
+sendPickUpNotification();

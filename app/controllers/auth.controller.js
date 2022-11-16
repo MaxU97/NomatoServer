@@ -521,7 +521,7 @@ exports.sendForgetEmail = (req, res) => {
       return;
     }
     if (!user) {
-      res.status(404).send({ message: t("user-update") });
+      res.status(404).send({ message: t("user-update.user-not-found") });
       return;
     }
     const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;

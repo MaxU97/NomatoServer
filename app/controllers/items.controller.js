@@ -159,6 +159,13 @@ exports.get = (req, res) => {
           if (addNew) {
             var newDesc = item.description;
             newDesc = [...newDesc, translatedDescription];
+            const newTags = generateTags(
+              "",
+              Object.values(translatedDescription)[0],
+              [],
+              []
+            );
+            item.tagCloud = [...item.tagCloud, ...newTags];
             item.description = newDesc;
             item.save();
           }
@@ -276,8 +283,16 @@ exports.getPopular = (req, res) => {
     });
 };
 
+const sortType = {
+  LikesAscending: "likes_asc",
+  LikesDescending: "likes_desc",
+  PriceAscending: "day_price_asc",
+  PriceDescending: "day_price_desc",
+};
+
 exports.searchItems = (req, res) => {
   var filter = { status: { $nin: ["hidden", "deleted"] } };
+
   const findArray = req.body.terms
     .toUpperCase()
     .split(/[,!?. ]+/)
@@ -292,6 +307,24 @@ exports.searchItems = (req, res) => {
     };
   }
 
+  var sort = {};
+  switch (req.body.sort_type) {
+    case sortType.LikesAscending:
+      sort = { likes: "ascending" };
+      break;
+    case sortType.LikesDescending:
+      sort = { likes: "descending" };
+      break;
+    case sortType.PriceAscending:
+      sort = { rentPriceDay: "ascending" };
+      break;
+    case sortType.PriceDescending:
+      sort = { rentPriceDay: "descending" };
+      break;
+    default:
+      sort = {};
+      break;
+  }
   if (req.body.category) {
     filter = {
       ...filter,
@@ -343,10 +376,11 @@ exports.searchItems = (req, res) => {
     rentPriceDay: 1,
   })
     .populate("user")
+    .sort(sort)
     .limit(16)
     .skip(16 * req.body.page)
     .exec((err, result) => {
-      Item.count().exec((err, count) => {
+      Item.count(filter).exec((err, count) => {
         let returnArray = [];
         result.forEach((r) => {
           returnArray.push({
@@ -364,9 +398,6 @@ exports.searchItems = (req, res) => {
             rentPriceDay: r.rentPriceDay,
           });
         });
-        if (result.length < 16) {
-          count = result.length;
-        }
         res
           .status(200)
           .send({ searchItems: returnArray, searchItemCount: count });
@@ -377,18 +408,23 @@ exports.searchItems = (req, res) => {
 const generateTags = (title, description, category, subcat) => {
   tagCloud = [];
 
-  tagCloud = [...tagCloud, ...title.split(/[,!?. ]+/)];
+  if (title) {
+    tagCloud = [...tagCloud, ...title.split(/[,!?. ]+/)];
+  }
 
-  tagCloud = [...tagCloud, ...category.titleRU.split(/[,!?. ]+/)];
-  tagCloud = [...tagCloud, ...category.titleLV.split(/[,!?. ]+/)];
-  tagCloud = [...tagCloud, ...category.titleEN.split(/[,!?. ]+/)];
-  if (subcat) {
+  if (category.length) {
+    tagCloud = [...tagCloud, ...category.titleRU.split(/[,!?. ]+/)];
+    tagCloud = [...tagCloud, ...category.titleLV.split(/[,!?. ]+/)];
+    tagCloud = [...tagCloud, ...category.titleEN.split(/[,!?. ]+/)];
+  }
+  if (subcat.length) {
     tagCloud = [...tagCloud, ...subcat.titleRU.split(/[,!?. ]+/)];
     tagCloud = [...tagCloud, ...subcat.titleLV.split(/[,!?. ]+/)];
     tagCloud = [...tagCloud, ...subcat.titleEN.split(/[,!?. ]+/)];
   }
-
-  tagCloud = [...tagCloud, ...description.split(/[,!?. ]+/)];
+  if (description) {
+    tagCloud = [...tagCloud, ...description.split(/[,!?. ]+/)];
+  }
 
   tagCloud = tagCloud
     .map((element) => {

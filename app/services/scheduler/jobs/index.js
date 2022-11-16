@@ -2,7 +2,7 @@ const path = require("path");
 module.exports = [
   {
     name: "sendPickUpNotification",
-    timeout: "at 12pm",
+    interval: "at 12:00pm",
     worker: {
       workerData: {
         description:

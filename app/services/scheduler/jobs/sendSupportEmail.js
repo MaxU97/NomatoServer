@@ -3,7 +3,7 @@ module.exports = sendSupportEmail = async (email) => {
   require("dotenv").config();
 
   var mailOptions = {
-    from: `<${email.email}>`,
+    from: process.env.EMAIL,
     to: process.env.EMAIL,
     subject: `Nomato Support Ticket ${email.subject}`,
     template: "supportemail",

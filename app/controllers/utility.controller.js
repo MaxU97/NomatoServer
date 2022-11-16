@@ -14,6 +14,6 @@ exports.sendSupport = async (req, res) => {
   } else {
     email.userID = "undefined";
   }
-  sendSupportEmail(email);
+  await sendSupportEmail(email);
   res.status(200).send({ message: t("support.sent") });
 };

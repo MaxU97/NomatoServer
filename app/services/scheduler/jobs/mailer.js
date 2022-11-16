@@ -12,6 +12,7 @@ module.exports = (mailOptions) => {
       pass: process.env.PASSWORD,
     },
   });
+
   const handlebarOptions = {
     viewEngine: {
       partialsDir: path.join(__dirname, "email_templates"),

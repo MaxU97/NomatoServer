@@ -475,6 +475,7 @@ exports.approveBooking = (req, res) => {
   Booking.findOne({
     ownerID: mongoose.Types.ObjectId(req.userId),
     _id: mongoose.Types.ObjectId(req.body.booking_id),
+
     status: { $nin: ["with_customer", "canceled", "refused", "returned"] },
   })
     .populate("userID")
@@ -509,6 +510,7 @@ exports.getApprovedUser = (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
+
   Booking.findOne({
     ownerID: mongoose.Types.ObjectId(req.userId),
     userID: mongoose.Types.ObjectId(req.body.userID),
@@ -665,7 +667,17 @@ exports.scanQR = (req, res) => {
         res.status(500).send({ status: false, message: t("error") });
         return;
       }
+      var dayNow = set(new Date(Date.now()), {
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+        milliseconds: 0,
+      });
       if (newStatus == "with_customer") {
+        if (booking.dateStart !== dayNow) {
+          res.status(400).send({ message: t("qr.cant-confirm-early") });
+          return;
+        }
         const price = getPrice(
           booking.dateEnd,
           booking.dateStart,
@@ -692,6 +704,10 @@ exports.scanQR = (req, res) => {
         finance.save();
         //TODO THINK ABOUT WHAT TO PUT ON PAYMENTID
       } else {
+        if (booking.dateEnd !== dayNow) {
+          res.status(400).send({ message: t("qr.cant-confirm-early-end") });
+          return;
+        }
         sendReviewRequest(booking);
         booking.reviewed = false;
       }

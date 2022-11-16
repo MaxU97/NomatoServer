@@ -1,4 +1,4 @@
-const autoCancelApprovedBooking = () => {
+const autoCancelApprovedBooking = async () => {
   try {
     const axios = require("axios");
     const https = require("https");

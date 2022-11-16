@@ -6,7 +6,9 @@
     "invalid": "Invalid QR Code",
     "pick-up": "Pick-up Confirmed",
     "drop-off": "Drop-off Confirmed",
-    "booking-not-found": "Booking not found or doesn't need approval"
+    "booking-not-found": "Booking not found or doesn't need approval",
+    "cant-confirm-early": "Booking cannot be confirmed before the start date",
+    "cant-confirm-early-end": "Booking cannot be dropped-off before the end date"
   },
   "error": "Something Went Wrong",
   "error-again": "Something went wrong, please try again",
@@ -49,7 +51,8 @@
     "nothing-changed": "Nothing was changed",
     "update-success2": "Please note:",
     "image-success": "Profile Image Updated",
-    "error": "Something Went Wrong"
+    "error": "Something Went Wrong",
+    "user-not-found": "User not found"
   },
   "booking": {
     "after-12-error": "You cannot make a booking on the same day after 12",
