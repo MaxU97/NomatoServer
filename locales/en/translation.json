@@ -11,6 +11,7 @@
     "cant-confirm-early-end": "Booking cannot be dropped-off before the end date"
   },
   "error": "Something Went Wrong",
+  "invalid-id": "Invalid Id",
   "error-again": "Something went wrong, please try again",
   "prereg": {
     "invalid-email": "Code Invalid",

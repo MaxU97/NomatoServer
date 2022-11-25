@@ -13,6 +13,10 @@ const {
 } = require("../utility/addressUtilities");
 const { getDaysBetween, filterDates } = require("../utility/datesUtilities");
 const i18n = require("../../locales/i18n");
+const {
+  isValidObjectId,
+  isListOfValidObjectIds,
+} = require("../utility/dbUtilities");
 exports.upload = (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
@@ -291,6 +295,10 @@ const sortType = {
 };
 
 exports.searchItems = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+
   var filter = { status: { $nin: ["hidden", "deleted"] } };
 
   const findArray = req.body.terms
@@ -326,10 +334,26 @@ exports.searchItems = (req, res) => {
       break;
   }
   if (req.body.category) {
-    filter = {
-      ...filter,
-      category: mongoose.Types.ObjectId(req.body.category),
-    };
+    if (isValidObjectId(req.body.category)) {
+      filter = {
+        ...filter,
+        category: mongoose.Types.ObjectId(req.body.category),
+      };
+    } else {
+      res.status(400).send({ message: t("items.invalid-id") });
+      return;
+    }
+  }
+
+  if (req.body.subcat) {
+    const subcats = req.body.subcat.split(",");
+
+    if (isListOfValidObjectIds(subcats)) {
+      filter = { ...filter, subcat: { $in: subcats } };
+    } else {
+      res.status(400).send({ message: t("items.invalid-id") });
+      return;
+    }
   }
 
   if (req.body.lat & req.body.lng) {
@@ -342,7 +366,7 @@ exports.searchItems = (req, res) => {
       address: {
         $nearSphere: {
           $geometry: geometry,
-          $maxDistance: req.body.km ? req.body.km : 10000,
+          $maxDistance: req.body.km ? req.body.km : 1000,
         },
       },
     };
