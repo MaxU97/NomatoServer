@@ -10,7 +10,13 @@ const i18n = require("../../locales/i18n");
 const getDiscriminatorByValue = require("mongoose/lib/helpers/discriminator/getDiscriminatorByValue");
 const path = require("path");
 
+const NewsTemplates = ["one-column", "two-columns"];
+
 exports.upload = (req, res) => {
+  if (!NewsTemplates.includes(req.body.template)) {
+    res.status(400).send({ message: "Please select a valid news template" });
+    return;
+  }
   const news = new News({
     userID: mongoose.Types.ObjectId(req.userId),
     dateAdded: Date.now(),
@@ -18,6 +24,7 @@ exports.upload = (req, res) => {
     title: req.body.title,
     image: req.files[0].filename,
     language: req.body.language.toUpperCase(),
+    template: req.body.template,
   });
   news.save((err, news) => {
     if (err) {
@@ -25,11 +32,15 @@ exports.upload = (req, res) => {
       return;
     }
 
-    res.status(200).send({ message: "News Uploaded" });
+    res.status(200).send({ message: "News Uploaded", id: news.id });
   });
 };
 
 exports.update = (req, res) => {
+  if (!NewsTemplates.includes(req.body.template)) {
+    res.status(400).send({ message: "Please select a valid news template" });
+    return;
+  }
   if (req.body.id) {
     News.findOne({
       deleted: false,
@@ -40,6 +51,11 @@ exports.update = (req, res) => {
         return;
       }
       var changed = false;
+
+      if (req.body.template !== doc.template) {
+        doc.template = req.body.template;
+        changed = true;
+      }
 
       if (req.body.language !== doc.language) {
         doc.language = req.body.language;

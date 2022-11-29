@@ -12,6 +12,7 @@ const News = mongoose.model(
     title: String,
     image: String,
     dateAdded: Date,
+    template: String,
     hidden: { type: Boolean, required: true, default: false },
     deleted: { type: Boolean, required: true, default: false },
   })
