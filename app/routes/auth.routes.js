@@ -10,11 +10,7 @@ module.exports = function (app, uploadProfilePicture) {
     );
     next();
   });
-  app.post(
-    "/api/auth/signup",
-    [verifySignUp.checkDuplicateEmail],
-    controller.signup
-  );
+  app.post("/api/auth/signup", controller.signup);
   app.post(
     "/api/auth/preRegEmail",
     [verifySignUp.checkDuplicateEmail, verifySignUp.checkPreRegEmail],
