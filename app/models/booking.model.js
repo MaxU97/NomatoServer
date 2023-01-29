@@ -15,6 +15,13 @@ const Booking = mongoose.model(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Item",
     },
+    extras: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ItemExtra",
+        required: false,
+      },
+    ],
     comment: String,
     refuseReason: String,
     reviewed: Boolean,

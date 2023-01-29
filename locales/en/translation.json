@@ -60,6 +60,7 @@
     "no-booking-today": "You cannot make a booking before today",
     "request-sent-owner": "Request sent to owner",
     "booked-dates": "You are not allowed to book dates that are already booked",
+    "booking-exists": "Booking already exists",
     "half-refund": "Booking Cancelled, half refunded",
     "none-refund": "Booking Cancelled, nothing refunded",
     "all-refund": "Booking Cancelled, Refunded All",

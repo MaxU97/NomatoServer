@@ -7,7 +7,7 @@ checkDuplicateEmail = (req, res, next) => {
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
   User.findOne({
-    email: req.body.email.toLowerCase(),
+    email: req.body.email.toLowerCase().replace(/\s/g, ""),
   }).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -23,7 +23,7 @@ checkDuplicateEmail = (req, res, next) => {
 
 checkPreRegEmail = (req, res, next) => {
   PreReg.findOne({
-    email: req.body.email.toLowerCase(),
+    email: req.body.email.toLowerCase().replace(/\s/g, ""),
   }).exec((err, prereg) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -43,7 +43,7 @@ checkEmailConfirmed = (req, res, next) => {
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
   PreReg.findOneAndDelete({
-    email: req.body.email.toLowerCase(),
+    email: req.body.email.toLowerCase().replace(/\s/g, ""),
   }).exec((err, prereg) => {
     if (prereg) {
       if (err) {

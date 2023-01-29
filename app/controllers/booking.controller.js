@@ -70,6 +70,7 @@ exports.request = async (req, res) => {
 
   Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemID) })
     .populate("user")
+    .populate("extras")
     .exec((err, item) => {
       Booking.find(
         {
@@ -99,11 +100,22 @@ exports.request = async (req, res) => {
           }
         });
         if (allowBooking) {
+          var extras = [];
+          if (req.body.extrasList.length > 0) {
+            var extrasIds = req.body.extrasList.map((value, index) => {
+              return value.id;
+            });
+            extras = item.extras.filter((item) => {
+              return extrasIds.includes(item.id);
+            });
+          }
+
           price = getPrice(
             req.body.dateEnd,
             req.body.dateStart,
             req.body.qtyWant,
-            item
+            item,
+            extras
           );
           var fee = price * process.env.SERVICE_FEE;
           price = price + fee;
@@ -139,14 +151,19 @@ exports.request = async (req, res) => {
 };
 
 exports.recordBooking = (req, res) => {
-  console.log(req);
   Booking.findOne({
     piid: req.body.client_secret,
     userID: mongoose.Types.ObjectId(req.userId),
   }).exec((err, bk) => {
+    const t = i18n(
+      req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+    );
     if (bk) {
-      res.status(200).send("Booking already exists");
+      res.status(200).send({ message: t("booking.booking-exists") });
     } else {
+      const extrasIds = req.body.itemData.extrasList.map((value, index) => {
+        return value.id;
+      });
       Item.findOne(
         {
           _id: mongoose.Types.ObjectId(req.body.itemData.itemID),
@@ -154,21 +171,30 @@ exports.recordBooking = (req, res) => {
         {
           user: 1,
         }
-      ).exec((err, item) => {
-        const booking = new Booking({
-          userID: req.userId,
-          ownerID: item.user,
-          itemID: req.body.itemData.itemID,
-          comment: req.body.itemData.comment,
-          dateStart: req.body.itemData.dateStart,
-          dateEnd: req.body.itemData.dateEnd,
-          qtyWant: req.body.itemData.qtyWant,
-          status: req.body.status,
-          piid: req.body.client_secret,
+      )
+        .populate({ path: "extras", match: { _id: { $in: extrasIds } } })
+        .exec((err, item) => {
+          if (err) {
+            res.status(400).send({ message: t("error") });
+            return;
+          }
+          if (item) {
+            const booking = new Booking({
+              userID: req.userId,
+              ownerID: item.user,
+              itemID: item.id,
+              comment: req.body.itemData.comment,
+              dateStart: req.body.itemData.dateStart,
+              dateEnd: req.body.itemData.dateEnd,
+              qtyWant: req.body.itemData.qtyWant,
+              extras: item.extras,
+              status: req.body.status,
+              piid: req.body.client_secret,
+            });
+            booking.save();
+            res.status(200).send("Booking sent");
+          }
         });
-        booking.save();
-        res.status(200).send("Booking sent");
-      });
     }
   });
 };
@@ -242,12 +268,79 @@ exports.getBookingHistory = (req, res) => {
         descRU: 0,
       },
     })
+    .populate({ path: "extras" })
     .sort({ created: -1 })
-    .exec((err, bookings) => {
+    .exec(async (err, bookings) => {
       if (err) {
         res.status(404).send({ error: t("error") });
       }
-      res.send({ bookingHistory: bookings });
+
+      var bookingsToReturn = await Promise.all(
+        bookings.map(async (item, index) => {
+          if (item.extras.length) {
+            var extrasToReturn = await Promise.all(
+              item.extras.map(async (extra, index) => {
+                var extraTitle;
+                var extraDescription;
+
+                extra.title.every((value, index) => {
+                  if (value[req.headers["accept-language"]]) {
+                    extraTitle = value[req.headers["accept-language"]];
+                    return false;
+                  }
+                  return true;
+                });
+
+                extra.description.every((value, index) => {
+                  if (value[req.headers["accept-language"]]) {
+                    extraDescription = value[req.headers["accept-language"]];
+                    return false;
+                  }
+                  return true;
+                });
+                return {
+                  id: extra.id,
+                  title: extraTitle
+                    ? extraTitle
+                    : Object.values(extra.title[0])[0],
+                  price: extra.price,
+                  description: extraDescription
+                    ? extraDescription
+                    : Object.values(extra.description[0])[0],
+                };
+              })
+            );
+
+            return {
+              itemID: item.itemID,
+              comment: item.comment,
+              created: item.created,
+              dateEnd: item.dateEnd,
+              dateStart: item.dateStart,
+              extras: extrasToReturn,
+              intentID: item.intentID,
+              qtyWant: item.qtyWant,
+              status: item.status,
+              _id: item._id,
+            };
+          } else {
+            return {
+              itemID: item.itemID,
+              comment: item.comment,
+              created: item.created,
+              dateEnd: item.dateEnd,
+              dateStart: item.dateStart,
+              extras: undefined,
+              intentID: item.intentID,
+              qtyWant: item.qtyWant,
+              status: item.status,
+              _id: item._id,
+            };
+          }
+        })
+      );
+
+      res.send({ bookingHistory: bookingsToReturn });
     });
 };
 
@@ -280,16 +373,85 @@ exports.getRequests = (req, res) => {
         descRU: 0,
       },
     })
+    .populate({ path: "extras" })
     .sort({ created: -1 })
     .populate({
       path: "userID",
-      select: { _id: 1, name: 1, surname: 1, profileImage: 1 },
+      select: { _id: 1, name: 1, surname: 1, profileImage: 1, languages: 1 },
     })
-    .exec((err, bookings) => {
+    .exec(async (err, bookings) => {
       if (err) {
         res.status(404).send({ error: t("error") });
       }
-      res.send({ bookingRequests: bookings });
+
+      var bookingsToReturn = await Promise.all(
+        bookings.map(async (item, index) => {
+          if (item.extras.length) {
+            var extrasToReturn = await Promise.all(
+              item.extras.map(async (extra, index) => {
+                var extraTitle;
+                var extraDescription;
+
+                extra.title.every((value, index) => {
+                  if (value[req.headers["accept-language"]]) {
+                    extraTitle = value[req.headers["accept-language"]];
+                    return false;
+                  }
+                  return true;
+                });
+
+                extra.description.every((value, index) => {
+                  if (value[req.headers["accept-language"]]) {
+                    extraDescription = value[req.headers["accept-language"]];
+                    return false;
+                  }
+                  return true;
+                });
+                return {
+                  id: extra.id,
+                  title: extraTitle
+                    ? extraTitle
+                    : Object.values(extra.title[0])[0],
+                  price: extra.price,
+                  description: extraDescription
+                    ? extraDescription
+                    : Object.values(extra.description[0])[0],
+                };
+              })
+            );
+
+            return {
+              itemID: item.itemID,
+              userID: item.userID,
+              comment: item.comment,
+              created: item.created,
+              dateEnd: item.dateEnd,
+              dateStart: item.dateStart,
+              extras: extrasToReturn,
+              intentID: item.intentID,
+              qtyWant: item.qtyWant,
+              status: item.status,
+              _id: item._id,
+            };
+          } else {
+            return {
+              itemID: item.itemID,
+              userID: item.userID,
+              comment: item.comment,
+              created: item.created,
+              dateEnd: item.dateEnd,
+              dateStart: item.dateStart,
+              extras: undefined,
+              intentID: item.intentID,
+              qtyWant: item.qtyWant,
+              status: item.status,
+              _id: item._id,
+            };
+          }
+        })
+      );
+
+      res.send({ bookingRequests: bookingsToReturn });
     });
 };
 
@@ -304,6 +466,7 @@ exports.cancelBooking = (req, res) => {
   })
     .populate("itemID")
     .populate("ownerID")
+    .populate("extras")
     .exec((err, booking) => {
       if (err) {
         res.status(404).send({ error: t("error") });
@@ -336,7 +499,8 @@ const cancelApprovedBooking = async (req, res, booking) => {
     booking.dateEnd,
     booking.dateStart,
     booking.qtyWant,
-    booking.itemID
+    booking.itemID,
+    booking.extras
   );
 
   const hoursUntilBooking = differenceInHours(
@@ -517,7 +681,7 @@ exports.getApprovedUser = (req, res) => {
     _id: mongoose.Types.ObjectId(req.body.booking_id),
     status: { $in: ["approved"] },
   })
-    .populate({ path: "userID", select: { number: 1, email: 1, _id: 0 } })
+    .populate({ path: "userID", select: { phone: 1, email: 1, _id: 0 } })
     .exec((err, booking) => {
       if (err) {
         res.status(404).send({ error: t("error") });
@@ -656,6 +820,7 @@ exports.scanQR = (req, res) => {
   })
     .populate("ownerID")
     .populate("itemID")
+    .populate("extras")
     .exec(async (err, booking) => {
       if (!booking) {
         res
@@ -682,7 +847,8 @@ exports.scanQR = (req, res) => {
           booking.dateEnd,
           booking.dateStart,
           booking.qtyWant,
-          booking.itemID
+          booking.itemID,
+          booking.extras
         );
 
         const transfer = await stripe.transfers.create({
@@ -784,11 +950,18 @@ exports.getAvailableQty = (req, res) => {
   });
 };
 
-const getPrice = (dateEnd, dateStart, qtyWant, item) => {
+const getPrice = (dateEnd, dateStart, qtyWant, item, extras) => {
   const dayCount = differenceInCalendarDays(
     new Date(dateEnd),
     new Date(dateStart)
   );
+
+  let extrasPrice = 0;
+  extras.every((value, index) => {
+    extrasPrice += value.price;
+    return true;
+  });
+
   if (dayCount < 7) {
     price = qtyWant * dayCount * item.rentPriceDay * 100;
   } else if (7 <= dayCount && dayCount < 30) {
@@ -796,7 +969,7 @@ const getPrice = (dateEnd, dateStart, qtyWant, item) => {
   } else if (dayCount >= 30) {
     price = qtyWant * dayCount * item.rentPriceMonth * 100;
   }
-  return price;
+  return price + extrasPrice * 100;
 };
 
 exports.checkExpiredBookings = (req, res) => {
@@ -833,6 +1006,7 @@ exports.checkApprovedBookings = (req, res) => {
   })
     .populate("ownerID")
     .populate("itemID")
+    .populate("extras")
     .exec((err, bookings) => {
       if (!bookings) {
         console.log("No bookings expired");
@@ -845,7 +1019,8 @@ exports.checkApprovedBookings = (req, res) => {
             booking.dateEnd,
             booking.dateStart,
             booking.qtyWant,
-            booking.itemID
+            booking.itemID,
+            booking.extras
           );
           await stripe.transfers.create({
             amount: price,

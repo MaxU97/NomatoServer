@@ -5,7 +5,13 @@ const mongoose = require("mongoose");
 const Item = db.item;
 const Booking = db.booking;
 const Review = db.review;
-const { checkLanguage, getTranslation } = require("../middlewares/translate");
+const ItemExtra = db.itemextra;
+const {
+  checkLanguage,
+  getTranslation,
+  checkExtrasLanguage,
+  getExtraTranslation,
+} = require("../middlewares/translate");
 const { getNaturalAddress } = require("../middlewares/geocoder");
 const {
   parseAddressSpecific,
@@ -21,20 +27,38 @@ exports.upload = (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
+  var promises;
   const detectedLanguage = checkLanguage(req.body.description);
+  promises = [detectedLanguage];
+
+  if (req.body.extras) {
+    const extrasWithDetectedLanguage = checkExtrasLanguage(req.body.extras);
+    promises = [...promises, extrasWithDetectedLanguage];
+  }
+
   let images = [];
   req.files.forEach((image) => {
     images.push(image.filename);
   });
 
-  Promise.all([detectedLanguage]).then(async (result) => {
+  Promise.all(promises).then(async (result) => {
+    const detectedDesc = result[0];
+    const detectedExtras = result[1];
+
     const address = {
       type: "Point",
       coordinates: [req.body.addressLng, req.body.addressLat],
     };
     const newDescription = [
-      { [result[0][0]["language"]]: req.body.description },
+      { [detectedDesc[0]["language"]]: req.body.description },
     ];
+
+    const newExtras = detectedExtras.map((value, index) => {
+      const newItemExtra = new ItemExtra(value);
+      newItemExtra.save();
+      return newItemExtra;
+    });
+
     const item = new Item({
       title: req.body.title,
       images: images,
@@ -51,6 +75,7 @@ exports.upload = (req, res) => {
       dislikes: 0,
       user: req.userId,
       reviews: [],
+      extras: newExtras,
       addressNatural: JSON.parse(req.body.addressNatural),
     });
 
@@ -92,6 +117,7 @@ exports.get = (req, res) => {
       .populate("user")
       .populate("category")
       .populate("subcat")
+      .populate("extras")
       .exec((err, item) => {
         if (!item) {
           res.status(404).send({ message: t("items.no-exist") });
@@ -174,6 +200,45 @@ exports.get = (req, res) => {
             item.save();
           }
 
+          var extrasToReturn;
+          if (item.extras.length) {
+            extrasToReturn = await Promise.all(
+              item.extras.map(async (value, index) => {
+                var extra = await getExtraTranslation(
+                  value,
+                  req.headers["accept-language"]
+                );
+                extra.save();
+
+                var extraTitle;
+                var extraDescription;
+
+                extra.title.every((value, index) => {
+                  if (value[req.headers["accept-language"]]) {
+                    extraTitle = value[req.headers["accept-language"]];
+                    return false;
+                  }
+                  return true;
+                });
+
+                extra.description.every((value, index) => {
+                  if (value[req.headers["accept-language"]]) {
+                    extraDescription = value[req.headers["accept-language"]];
+                    return false;
+                  }
+                  return true;
+                });
+
+                return {
+                  id: value.id,
+                  title: extraTitle,
+                  price: value.price,
+                  description: extraDescription,
+                };
+              })
+            );
+          }
+
           if (item.subcat) {
             subcat = {
               id: item.subcat._id,
@@ -231,6 +296,7 @@ exports.get = (req, res) => {
                   likes: item.likes,
                   dislikes: item.dislikes,
                   bookedDates: bookedDates,
+                  extras: extrasToReturn,
                   user: {
                     id: item.user._id,
                     name: item.user.name,

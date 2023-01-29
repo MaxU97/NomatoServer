@@ -74,19 +74,3 @@ exports.withdraw = (req, res) => {
     }
   );
 };
-
-const getPrice = (dateEnd, dateStart, qtyWant, item) => {
-  var price;
-  const dayCount = differenceInCalendarDays(
-    new Date(dateEnd),
-    new Date(dateStart)
-  );
-  if (dayCount < 7) {
-    price = qtyWant * dayCount * item.rentPriceDay * 100;
-  } else if (7 <= dayCount && dayCount < 30) {
-    price = qtyWant * dayCount * item.rentPriceWeek * 100;
-  } else if (dayCount >= 30) {
-    price = qtyWant * dayCount * item.rentPriceMonth * 100;
-  }
-  return price;
-};

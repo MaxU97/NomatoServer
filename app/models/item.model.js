@@ -35,6 +35,9 @@ const Schema = new mongoose.Schema({
   likes: { type: Number, required: true },
   dislikes: { type: Number, required: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  extras: [
+    { type: mongoose.Schema.Types.ObjectId, ref: "ItemExtra", required: false },
+  ],
   tagCloud: [String],
 });
 
