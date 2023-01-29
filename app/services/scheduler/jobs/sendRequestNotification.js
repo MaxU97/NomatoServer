@@ -10,7 +10,7 @@ module.exports = sendRequestNotification = async (booking) => {
     context: {
       name: booking.ownerID.name,
       item_name: booking.itemID.title,
-      img_src: booking.itemID.images[0],
+      img_src: process.env.API_URL + booking.itemID.images[0],
       item_dateStart: booking.dateStart.toLocaleString("EN", {
         day: "numeric",
         month: "short",
