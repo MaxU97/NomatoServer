@@ -1,8 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const util = require("util");
 const app = express();
-const dbConfig = require("./app/config/db.config");
 const fs = require("fs");
 const dotenv = require("dotenv");
 dotenv.config();
@@ -101,19 +99,26 @@ require("./app/routes/finance.routes")(app);
 require("./app/routes/review.routes")(app);
 require("./app/routes/webhook.routes")(app);
 require("./app/routes/utility.routes")(app);
+require("./app/routes/admin.routes")(app);
 require("./app/services/scheduler/taskScheduler")();
 
 const PORT = process.env.PORT || 4000;
 console.log("yes");
 
-https
-  .createServer(
-    {
-      key: fs.readFileSync("./certification/cert.key"),
-      cert: fs.readFileSync("./certification/cert.crt"),
-    },
-    app
-  )
-  .listen(PORT, () => {
+if (process.env.MODE == "DEBUG") {
+  https
+    .createServer(
+      {
+        key: fs.readFileSync("./certification/cert.key"),
+        cert: fs.readFileSync("./certification/cert.crt"),
+      },
+      app
+    )
+    .listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}.`);
+    });
+} else {
+  app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}.`);
   });
+}

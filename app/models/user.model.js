@@ -20,6 +20,8 @@ const User = mongoose.model(
     languages: { type: [String], default: ["EN", "RU", "LV"] },
     customerID: String,
     completionStatus: { type: Boolean, default: false },
+    suspended: { type: Boolean, default: false },
+    warnings: { type: Number, default: 0 },
   })
 );
 

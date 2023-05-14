@@ -6,6 +6,7 @@ const Item = db.item;
 const Booking = db.booking;
 const Review = db.review;
 const ItemExtra = db.itemextra;
+const _ = require("lodash");
 const {
   checkLanguage,
   getTranslation,
@@ -23,6 +24,7 @@ const {
   isValidObjectId,
   isListOfValidObjectIds,
 } = require("../utility/dbUtilities");
+const sendItemReview = require("../services/scheduler/jobs/sendItemReview");
 exports.upload = (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
@@ -31,9 +33,15 @@ exports.upload = (req, res) => {
   const detectedLanguage = checkLanguage(req.body.description);
   promises = [detectedLanguage];
 
-  if (req.body.extras) {
-    const extrasWithDetectedLanguage = checkExtrasLanguage(req.body.extras);
-    promises = [...promises, extrasWithDetectedLanguage];
+  try {
+    let extrasJSON = JSON.parse(req.body.extras);
+    if (!_.isEmpty(extrasJSON[0])) {
+      const extrasWithDetectedLanguage = checkExtrasLanguage(extrasJSON);
+      promises = [...promises, extrasWithDetectedLanguage];
+    }
+  } catch (e) {
+    res.status(400).send({ message: t("error") });
+    return;
   }
 
   let images = [];
@@ -53,11 +61,14 @@ exports.upload = (req, res) => {
       { [detectedDesc[0]["language"]]: req.body.description },
     ];
 
-    const newExtras = detectedExtras.map((value, index) => {
-      const newItemExtra = new ItemExtra(value);
-      newItemExtra.save();
-      return newItemExtra;
-    });
+    var newExtras = [];
+    if (detectedExtras) {
+      newExtras = detectedExtras.map((value, index) => {
+        const newItemExtra = new ItemExtra(value);
+        newItemExtra.save();
+        return newItemExtra;
+      });
+    }
 
     const item = new Item({
       title: req.body.title,
@@ -104,10 +115,13 @@ exports.upload = (req, res) => {
     item.save();
     console.log(req.body);
     res.status(200).send({ message: t("items.listed") });
+    sendItemReview(item, req.userId);
   });
 };
 
 exports.get = (req, res) => {
+  var translationError;
+
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
@@ -169,10 +183,21 @@ exports.get = (req, res) => {
           }
 
           var addNew = false;
-          const translatedDescription = await getTranslation(
-            item.description,
-            req.headers["accept-language"]
-          );
+          var translatedDescription;
+          try {
+            translatedDescription = await getTranslation(
+              item.description,
+              req.headers["accept-language"]
+            );
+          } catch (err) {
+            if (err.default) {
+              translatedDescription = err.default;
+              translationError = t("microsoft.translation-error");
+            } else {
+              res.status(400).send({ message: t("error") });
+              return;
+            }
+          }
 
           item.description.every((value, index) => {
             if (
@@ -204,30 +229,40 @@ exports.get = (req, res) => {
           if (item.extras.length) {
             extrasToReturn = await Promise.all(
               item.extras.map(async (value, index) => {
-                var extra = await getExtraTranslation(
-                  value,
-                  req.headers["accept-language"]
-                );
-                extra.save();
+                var extra;
+                try {
+                  extra = await getExtraTranslation(
+                    value,
+                    req.headers["accept-language"]
+                  );
+                  extra.save();
+                } catch (err) {
+                  translationError = t("microsoft.translation-error");
+                }
 
                 var extraTitle;
                 var extraDescription;
 
-                extra.title.every((value, index) => {
-                  if (value[req.headers["accept-language"]]) {
-                    extraTitle = value[req.headers["accept-language"]];
-                    return false;
-                  }
-                  return true;
-                });
+                if (!translationError) {
+                  extra.title.every((value, index) => {
+                    if (value[req.headers["accept-language"]]) {
+                      extraTitle = value[req.headers["accept-language"]];
+                      return false;
+                    }
+                    return true;
+                  });
 
-                extra.description.every((value, index) => {
-                  if (value[req.headers["accept-language"]]) {
-                    extraDescription = value[req.headers["accept-language"]];
-                    return false;
-                  }
-                  return true;
-                });
+                  extra.description.every((value, index) => {
+                    if (value[req.headers["accept-language"]]) {
+                      extraDescription = value[req.headers["accept-language"]];
+                      return false;
+                    }
+                    return true;
+                  });
+                } else {
+                  extraTitle = Object.values(value.title[0])[0];
+                  extraDescription = Object.values(value.description[0])[0];
+                }
 
                 return {
                   id: value.id,
@@ -276,6 +311,10 @@ exports.get = (req, res) => {
                     lng: item.address.coordinates[0],
                     lat: item.address.coordinates[1],
                   },
+                  location: parseAddressSpecific(
+                    item.addressNatural,
+                    "locality"
+                  ),
                   title: item.title,
                   images: item.images,
                   category: {
@@ -305,6 +344,7 @@ exports.get = (req, res) => {
                   },
                   status: item.status,
                   recentReview: recentReview,
+                  translationError: translationError ? translationError : false,
                 },
               };
 
@@ -530,6 +570,7 @@ exports.update = (req, res) => {
   );
   Item.findOne({ _id: mongoose.Types.ObjectId(req.body.itemId) })
     .populate("user")
+    .populate("extras")
     .exec((err, item) => {
       if (err) {
         res.status(400).send({ message: t("error") });
@@ -564,61 +605,87 @@ exports.update = (req, res) => {
             Promise.all([detectedLanguage]).then(async (result) => {
               const address = {
                 type: "Point",
-                coordinates: [req.body.addressLng, req.body.addressLat],
+                coordinates: [
+                  parseFloat(req.body.addressLng),
+                  parseFloat(req.body.addressLat),
+                ],
               };
-              item.title = req.body.title;
-              item.images = images;
-              item.address = address;
-              item.category = req.body.category;
-              item.description = [
-                {
-                  [result[0][0]["language"]]: req.body.description,
-                },
-              ];
-              item.itemQty = req.body.itemQty;
-              item.itemValue = req.body.itemValue;
-              item.minRent = req.body.minRent;
-              item.rentPriceDay = req.body.rentPriceDay;
-              item.rentPriceWeek = req.body.rentPriceWeek;
-              item.rentPriceMonth = req.body.rentPriceMonth;
-              item.addressNatural = JSON.parse(req.body.addressNatural);
 
-              var tags;
-              if (req.body.subcat) {
-                item.subcat = req.body.subcat;
-                await item.populate("category");
-                await item.populate("subcat");
-                tags = generateTags(
-                  item.title,
-                  Object.values(item.description[0])[0],
-                  item.category,
-                  item.subcat
-                );
-              } else {
-                await item.populate("category");
-                tags = generateTags(
-                  item.title,
-                  Object.values(item.description[0])[0],
-                  item.category,
-                  ""
-                );
+              req.body.address = address;
+
+              var extrasReturn = { returnedExtras: [], extrasUpdated: false };
+              try {
+                extrasReturn = await updateExtras(item, req.body.extras);
+              } catch (e) {
+                res.status(400).send({ message: t("error") });
+                return;
               }
 
-              item.tagCloud = tags;
-              item.save();
-              console.log(req.body);
-              res.status(200).send({ message: t("items.updated") });
+              if (
+                checkItemForChange(item, req.body, images) ||
+                extrasReturn.extrasUpdated
+              ) {
+                item.title = req.body.title;
 
-              oldImages.forEach((image) => {
-                fs.unlink(
-                  path.join(process.cwd(), "uploads", image),
-                  function (err) {
-                    if (err) throw err;
-                    // if no error, file has been deleted successfully
-                    console.log("File deleted!");
-                  }
-                );
-              });
+                if (images.length) {
+                  item.images = images;
+                  oldImages.forEach((image) => {
+                    fs.unlink(
+                      path.join(process.cwd(), "uploads", image),
+                      function (err) {
+                        if (err) throw err;
+                        // if no error, file has been deleted successfully
+                        console.log("File deleted!");
+                      }
+                    );
+                  });
+                }
+
+                item.address = address;
+                item.category = req.body.category;
+                item.description = [
+                  {
+                    [result[0][0]["language"]]: req.body.description,
+                  },
+                ];
+                item.itemQty = req.body.itemQty;
+                item.itemValue = req.body.itemValue;
+                item.minRent = req.body.minRent;
+                item.rentPriceDay = req.body.rentPriceDay;
+                item.rentPriceWeek = req.body.rentPriceWeek;
+                item.rentPriceMonth = req.body.rentPriceMonth;
+                item.addressNatural = JSON.parse(req.body.addressNatural);
+                item.extras = extrasReturn.returnedExtras;
+                var tags;
+                if (req.body.subcat) {
+                  item.subcat = req.body.subcat;
+                  await item.populate("category");
+                  await item.populate("subcat");
+                  tags = generateTags(
+                    item.title,
+                    Object.values(item.description[0])[0],
+                    item.category,
+                    item.subcat
+                  );
+                } else {
+                  await item.populate("category");
+                  tags = generateTags(
+                    item.title,
+                    Object.values(item.description[0])[0],
+                    item.category,
+                    ""
+                  );
+                }
+
+                item.tagCloud = tags;
+                item.save();
+                console.log(req.body);
+                res.status(200).send({ message: t("items.updated") });
+                sendItemReview(item, item.user.id, true);
+              } else {
+                res.status(400).send({ message: t("items.nothing-changed") });
+                return;
+              }
             });
           } else {
             res.status(401).send({ message: t("items.not-auth") });
@@ -628,6 +695,137 @@ exports.update = (req, res) => {
     });
 };
 
+const generateNewExtras = async (newExtras) => {
+  try {
+    if (!_.isEmpty(newExtras[0])) {
+      const extrasWithDetectedLanguage = checkExtrasLanguage(newExtras);
+      promises = [extrasWithDetectedLanguage];
+    } else {
+      return [];
+    }
+
+    return await Promise.all(promises).then((result) => {
+      const extrasWithLanguage = result[0];
+
+      extrasToReturn = extrasWithLanguage.map((value, index) => {
+        const newItemExtra = new ItemExtra(value);
+        newItemExtra.save();
+        return newItemExtra;
+      });
+
+      return extrasToReturn;
+    });
+  } catch (e) {
+    throw e;
+  }
+};
+
+const updateExtras = async (item, newExtras) => {
+  let extrasUpdated = false;
+  let returnedExtras = [];
+  const extras = JSON.parse(newExtras);
+
+  if (item.extras.length && _.isEmpty(extras[0])) {
+    extrasUpdated = true;
+    return { returnedExtras, extrasUpdated };
+  } else {
+    var extrasToCreate = [];
+    var extrasToEdit = [];
+    extras.forEach((extra, index) => {
+      if (extra["id"]) {
+        extrasToEdit.push(extra["id"]);
+      } else if (!_.isEmpty(extra)) {
+        extrasUpdated = true;
+        extrasToCreate.push(extra);
+      }
+    });
+
+    //editing existing extras
+    try {
+      const oldExtras = await ItemExtra.find({ _id: { $in: extrasToEdit } });
+
+      if (oldExtras.length) {
+        oldExtras.forEach(async (extra, index) => {
+          const newExtra = extras.find((e) => e.id == extra.id);
+
+          if (Object.values(extra.title[0])[0] !== newExtra.title) {
+            extra.title = { OG: newExtra.title };
+            extrasUpdated = true;
+          }
+
+          if (Object.values(extra.description[0])[0] !== newExtra.description) {
+            extra.description = { OG: newExtra.title };
+            extrasUpdated = true;
+          }
+
+          if (extra.price != newExtra.price) {
+            extra.price = newExtra.price;
+            extrasUpdated = true;
+          }
+          await extra.save();
+        });
+      }
+
+      //new extras
+      var createdExtras = [];
+      if (extrasToCreate.length) {
+        createdExtras = await generateNewExtras(extrasToCreate);
+        if (createdExtras.length) {
+          extrasUpdated = true;
+        }
+      }
+
+      returnedExtras = [...oldExtras, ...createdExtras];
+
+      return { returnedExtras, extrasUpdated };
+    } catch (e) {
+      throw e;
+    }
+  }
+};
+
+const checkItemForChange = (item, newItem, images) => {
+  const keys = [
+    "category",
+    "itemQty",
+    "itemValue",
+    "minRent",
+    "rentPriceDay",
+    "rentPriceWeek",
+    "rentPriceMonth",
+    "title",
+  ];
+  var changed = false;
+
+  item.description.every((value, index) => {
+    if (Object.values(value)[0] == newItem.description) {
+      changed = false;
+      return false;
+    } else {
+      changed = true;
+      return true;
+    }
+  });
+
+  if (images.length) {
+    changed = true;
+  }
+
+  keys.every((key, index) => {
+    if (item[key] != newItem.key) {
+      changed = true;
+      return false;
+    } else {
+      return true;
+    }
+  });
+
+  if (!_.isEqual(item.address.toObject(), newItem.address)) {
+    changed = true;
+  }
+
+  return changed;
+};
 exports.delete = (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"

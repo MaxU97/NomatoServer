@@ -1,8 +1,6 @@
 const axios = require("axios");
 
 exports.checkLanguage = (description) => {
-  const axios = require("axios");
-
   const data = [
     {
       Text: description,
@@ -27,12 +25,11 @@ exports.checkLanguage = (description) => {
     })
     .catch(function (error) {
       console.error(error);
+      return [{ language: "OG" }];
     });
 };
 
-exports.checkExtrasLanguage = (extras) => {
-  const axios = require("axios");
-  const evaluatedExtras = eval(extras);
+exports.checkExtrasLanguage = (evaluatedExtras) => {
   const extrasData = evaluatedExtras.map((value, index) => {
     return { Text: value.title };
   });
@@ -65,6 +62,14 @@ exports.checkExtrasLanguage = (extras) => {
     })
     .catch(function (error) {
       console.error(error);
+      const newExtras = evaluatedExtras.map((value, index) => {
+        return {
+          title: [{ OG: value.title }],
+          price: value.price,
+          description: value.description ? [{ OG: value.description }] : "",
+        };
+      });
+      return newExtras;
     });
 };
 
@@ -78,9 +83,14 @@ exports.getTranslation = async (description, language) => {
     return true;
   });
 
-  if (!desc) {
-    desc = await translate(Object.values(description[0])[0], language);
+  try {
+    if (!desc) {
+      desc = await translate(Object.values(description[0])[0], language);
+    }
+  } catch (err) {
+    throw { err, default: description[0] };
   }
+
   return desc;
 };
 const translate = async (text, to) => {
@@ -115,7 +125,7 @@ const translate = async (text, to) => {
       };
     })
     .catch(function (error) {
-      console.error(error);
+      throw error;
     });
 };
 
@@ -180,6 +190,6 @@ exports.getExtraTranslation = async (extra, language) => {
       return extra;
     })
     .catch(function (error) {
-      console.error(error);
+      throw error;
     });
 };

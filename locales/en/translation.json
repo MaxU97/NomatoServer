@@ -1,6 +1,10 @@
 {
+  "microsoft": {
+    "translation-error": "There was an error with the translation service, sorry for any inconvenience"
+  },
   "login": {
-    "invalid": "Invalid Details"
+    "invalid": "Invalid Details",
+    "account-banned": "Your account has been banned, please contact support for more information"
   },
   "qr": {
     "invalid": "Invalid QR Code",
@@ -42,7 +46,15 @@
     "no-profile": "Your profile is not complete",
     "no-old-pw": "You must enter the old password",
     "new-is-old-pw": "The new password must be different to the old password",
-    "old-pw-wrong": "The old password is wrong"
+    "old-pw-wrong": "The old password is wrong",
+    "user-banned": "User Banned",
+    "user-pardoned": "User Pardoned",
+    "user-warned": "User Warned",
+    "ban-warn": "Can't warn banned user",
+    "cant-remove-more-warnings": "Can't remove more warnings than there is",
+    "warnings-removed": "Warning(s) removed",
+    "user-is-admin": "User is now an admin",
+    "user-not-admin": "User is no longer an admin"
   },
   "user-update": {
     "phone-err": "Phone can only be updated once every 30 days",
@@ -85,6 +97,7 @@
   "items": {
     "listed": "Item has been listed",
     "no-exist": "Item does not exist",
+    "nothing-changed": "Nothing was changed",
     "cant-edit-process": "Items cannot be edited if there are any bookings waiting for approval, or they have been rented before",
     "cant-delete-process": "Items cannot be deleted if there are any bookings waiting for approval, or any active rentals",
     "cant-hide-process": "Items cannot be hidden if there are any bookings waiting for approval or are currently being rented",

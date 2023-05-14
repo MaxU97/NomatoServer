@@ -71,7 +71,7 @@ checkDuplicatePhone = (req, res, next) => {
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
   User.findOne({
-    phone: req.body.phone,
+    phone: req.body.phone.replace("+", ""),
   }).exec((err, user) => {
     if (err) {
       res.status(500).send({ message: err });
@@ -115,7 +115,7 @@ checkPhoneTimeout = (req, res, next) => {
   );
   PreReg.findOne({
     email: req.body.email.toLowerCase(),
-    phone: req.body.phone,
+    phone: req.body.phone.replace("+", ""),
   }).exec((err, prereg) => {
     if (err) {
       res.status(500).send({ message: err });

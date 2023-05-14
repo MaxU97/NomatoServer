@@ -86,4 +86,10 @@ module.exports = function (app, uploadProfilePicture) {
     [authJwt.verifyToken],
     controller.createStripeAccount
   );
+
+  app.get(
+    "/api/auth/getUser",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    controller.getUser
+  );
 };

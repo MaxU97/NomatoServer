@@ -27,7 +27,7 @@ exports.signup = async (req, res) => {
   }).exec(async (err, prereg) => {
     const user = new User({
       email: prereg.email.toLowerCase(),
-      phone: prereg.phone,
+      phone: prereg.phone.replace("+", ""),
       phoneLastChanged: Date.now(),
       password: prereg.password,
       lastActive: Date.now(),
@@ -66,6 +66,9 @@ exports.signin = async (req, res) => {
     }
     if (!user) {
       return res.status(401).send({ message: t("login.invalid") });
+    }
+    if (user.suspended) {
+      return res.status(401).send({ message: t("login.account-banned") });
     }
     var passwordIsValid = bcrypt.compareSync(req.body.password, user.password);
     if (!passwordIsValid) {
@@ -138,7 +141,7 @@ exports.preRegPhone = (req, res) => {
       return;
     }
     if (prereg) {
-      prereg.phone = req.body.phone;
+      prereg.phone = req.body.phone.replace("+", "");
       prereg.phoneConfirmNumber = number;
       prereg.languages = req.body.languages;
       prereg.save(async (err, prereg) => {
@@ -148,7 +151,7 @@ exports.preRegPhone = (req, res) => {
         } else {
           try {
             await sendPhoneConfirmation(req, number);
-            res.send({ phone: prereg.phone });
+            res.send({ phone: prereg.phone.replace("+", "") });
           } catch (err) {
             res.status(500).send({ message: t("error-again") });
           }
@@ -161,25 +164,27 @@ exports.preRegPhone = (req, res) => {
 };
 
 const sendPhoneConfirmation = async (req, code) => {
-  // // http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
-  // var axios = require("axios");
-  // const t = i18n(req.headers["accept-language"] ? req.headers["accept-language"] : "en");
-  // const text = t("phone-message") + " " + code;
-  // const sender = "NomaTo";
-  // const api = process.env.SMS_API;
-  // const number = req.body.phone;
-  // const url = `https://api1.esteria.lv/send?api-key=${api}&sender=${sender}&number=${number}&text=${text}`;
-  // axios
-  //   .get(url)
-  //   .then((res) => {
-  //     console.log(res);
-  //     if (res.data < 100) {
-  //       throw t("error");
-  //     }
-  //   })
-  //   .catch((error) => {
-  //     throw error;
-  //   });
+  // http://api1.esteria.lv/send?api-key=%api-key%&sender=%sender%&number=%number%&text=%text%
+  var axios = require("axios");
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+  const text = t("phone-message") + " " + code;
+  const sender = "NomaTo";
+  const api = process.env.SMS_API;
+  const number = req.body.phone.replace("+", "");
+  const url = `https://api1.esteria.lv/send?api-key=${api}&sender=${sender}&number=${number}&text=${text}`;
+  return axios
+    .get(url)
+    .then((res) => {
+      console.log(res);
+      if (res.data < 100) {
+        throw t("error");
+      }
+    })
+    .catch((error) => {
+      throw error;
+    });
 };
 
 exports.confirmEmail = (req, res) => {
@@ -233,7 +238,7 @@ exports.confirmPhone = (req, res) => {
   );
   PreReg.findOne({
     email: req.body.email.toLowerCase(),
-    phone: req.body.phone,
+    phone: req.body.phone.replace("+", ""),
   }).exec((err, prereg) => {
     if (err) {
       res.status(500).send({ message: t("error") });
@@ -257,7 +262,7 @@ exports.resendPhoneCode = (req, res) => {
   if (res.locals.emailExists) {
     PreReg.findOne({
       email: req.body.email.toLowerCase(),
-      phone: req.body.phone,
+      phone: req.body.phone.replace("+", ""),
     }).exec(async (err, prereg) => {
       if (err) {
         res.status(500).send({ message: t("error") });
@@ -321,7 +326,7 @@ exports.getSelf = (req, res) => {
       name: user.name,
       surname: user.surname,
       address: address,
-      phone: user.phone,
+      phone: "+" + user.phone,
       email: user.email,
       admin: user.admin,
       profileImage: user.profileImage,
@@ -363,11 +368,11 @@ exports.updateUser = (req, res) => {
       user.phoneLastChanged
     );
 
-    if ("+" + user.phone != req.body.phone) {
+    if (user.phone != req.body.phone.replace("+", "")) {
       if (phoneDiff < 30) {
         phoneError = t("user-update.phone-err");
       } else {
-        user.phone = req.body.phone;
+        user.phone = req.body.phone.replace("+", "");
         user.phoneLastChanged = Date.now();
         updated = true;
       }
@@ -406,7 +411,7 @@ exports.updateUser = (req, res) => {
       name: user.name,
       surname: user.surname,
       address: address,
-      phone: user.phone,
+      phone: "+" + user.phone,
       email: user.email,
       admin: user.admin,
       profileImage: user.profileImage,
@@ -759,6 +764,42 @@ exports.createStripeAccount = (req, res) => {
       } catch (err) {
         res.status(err.statusCode).send({ message: err.message });
       }
+    }
+  );
+};
+
+exports.getUser = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+  User.findOne({ _id: mongoose.Types.ObjectId(req.query.id) }).exec(
+    (err, user) => {
+      if (err) {
+        res.status(400).send({ message: err });
+        return;
+      }
+      if (!user) {
+        res.status(404).send({ message: t("auth.user-not-found") });
+        return;
+      }
+
+      res.status(200).send({
+        id: user._id,
+        email: user.email,
+        phone: "+" + user.phone,
+        admin: user.admin,
+        profileImage: user.profileImage,
+        lastActive: user.lastActive,
+        languages: user.languages,
+        completionStatus: user.completionStatus,
+        address: user.address && parseAddressFull(user.address),
+        name: user.name,
+        surname: user.surname,
+        stripeId: user.customerID,
+        suspended: user.suspended,
+        warnings: user.warnings,
+      });
+      return;
     }
   );
 };
