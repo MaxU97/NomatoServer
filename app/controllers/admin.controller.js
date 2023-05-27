@@ -5,6 +5,7 @@ const i18n = require("../../locales/i18n");
 const sendPardonEmail = require("../services/scheduler/jobs/sendPardonEmail");
 const sendBanEmail = require("../services/scheduler/jobs/sendBanEmail");
 const sendWarnEmail = require("../services/scheduler/jobs/sendWarnEmail");
+const News = db.news;
 const User = db.user;
 const Booking = db.booking;
 
@@ -339,6 +340,37 @@ exports.getUserList = (req, res) => {
       }
       User.count(searchFilter).exec((err, count) => {
         res.send({ users: users, totalCount: count });
+      });
+    });
+};
+
+exports.getNewsList = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+
+  var searchFilter = { deleted: { $ne: true } };
+
+  if (req.query.searchTerm) {
+    searchFilter = {
+      ...searchFilter,
+      $or: [{ title: { $regex: req.query.searchTerm } }],
+    };
+  }
+
+  News.find(searchFilter, {
+    _id: 1,
+    title: 1,
+    image: 1,
+    dateAdded: 1,
+  })
+    .limit(6 + parseInt(req.query.step))
+    .exec(async (err, news) => {
+      if (err) {
+        res.status(404).send({ error: t("error") });
+      }
+      News.count(searchFilter).exec((err, count) => {
+        res.send({ news: news, totalCount: count });
       });
     });
 };

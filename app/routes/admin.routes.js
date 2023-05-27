@@ -45,4 +45,10 @@ module.exports = function (app, uploadProfilePicture) {
     [authJwt.verifyToken, authJwt.isAdmin],
     controller.getUserList
   );
+
+  app.get(
+    "/api/admin/getNewsList",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    controller.getNewsList
+  );
 };
