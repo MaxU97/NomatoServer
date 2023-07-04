@@ -32,7 +32,7 @@ exports.getNaturalFromLongLat = async (lat, lng, language) => {
   const NodeGeocoder = require("node-geocoder");
   const options = {
     provider: "google",
-    apiKey: process.env.GOOGLE_API_KEY,
+    apiKey: process.env.GOOGLE_GEOCODE_API,
   };
   const geocoder = NodeGeocoder(options);
   const res = await geocoder.reverse({ lat: lat, lon: lng });
