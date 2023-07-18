@@ -12,7 +12,7 @@ exports.checkLanguage = (description) => {
     params: { "api-version": "3.0" },
     headers: {
       "content-type": "application/json",
-      "X-RapidAPI-Key": "c5c9bf999amshea9393e53a72314p141ec6jsn3b0184769137",
+      "X-RapidAPI-Key": process.env.RAPID_API_KEY,
       "X-RapidAPI-Host": "microsoft-translator-text.p.rapidapi.com",
     },
     data: JSON.stringify(data),
@@ -40,7 +40,7 @@ exports.checkExtrasLanguage = (evaluatedExtras) => {
     params: { "api-version": "3.0" },
     headers: {
       "content-type": "application/json",
-      "X-RapidAPI-Key": "c5c9bf999amshea9393e53a72314p141ec6jsn3b0184769137",
+      "X-RapidAPI-Key": process.env.RAPID_API_KEY,
       "X-RapidAPI-Host": "microsoft-translator-text.p.rapidapi.com",
     },
     data: JSON.stringify(extrasData),
@@ -110,7 +110,7 @@ const translate = async (text, to) => {
     },
     headers: {
       "content-type": "application/json",
-      "X-RapidAPI-Key": "c5c9bf999amshea9393e53a72314p141ec6jsn3b0184769137",
+      "X-RapidAPI-Key": process.env.RAPID_API_KEY,
       "X-RapidAPI-Host": "microsoft-translator-text.p.rapidapi.com",
     },
     data: JSON.stringify(data),
@@ -164,7 +164,7 @@ exports.getExtraTranslation = async (extra, language) => {
     },
     headers: {
       "content-type": "application/json",
-      "X-RapidAPI-Key": "c5c9bf999amshea9393e53a72314p141ec6jsn3b0184769137",
+      "X-RapidAPI-Key": process.env.RAPID_API_KEY,
       "X-RapidAPI-Host": "microsoft-translator-text.p.rapidapi.com",
     },
     data: JSON.stringify(toTranslate),

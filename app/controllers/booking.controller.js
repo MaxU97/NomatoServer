@@ -200,7 +200,7 @@ exports.recordBooking = (req, res) => {
 };
 
 exports.sendBookingToOwner = (req, res) => {
-  console.log(req.body);
+  console.log('req.body', req.body);
 
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
@@ -232,7 +232,7 @@ exports.sendBookingToOwner = (req, res) => {
       await stripe.paymentIntents.update(req.body.intentID, {
         transfer_group: booking.id,
       });
-      await sendRequestNotification(booking);
+      //await sendRequestNotification(booking);
       booking.save();
       res.status(200).send({ message: t("booking.request-sent-owner") });
     });
@@ -452,6 +452,26 @@ exports.getRequests = (req, res) => {
       );
 
       res.send({ bookingRequests: bookingsToReturn });
+    });
+};
+
+exports.getUnapprovedRequestCount = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+  Booking.find(
+    {
+      ownerID: mongoose.Types.ObjectId(req.userId),
+      status: { $in: ["approval_required"] },
+    },
+    { piid: 0, saveCard: 0, ownerID: 0 }
+  )
+    .exec(async (err, bookings) => {
+      if (err) {
+        res.status(404).send({ error: t("error") });
+      }
+
+      res.send({ count: bookings.length });
     });
 };
 

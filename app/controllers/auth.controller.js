@@ -133,6 +133,9 @@ exports.preRegEmail = (req, res) => {
 
 exports.preRegPhone = (req, res) => {
   const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
   PreReg.findOne({
     email: req.body.email.toLowerCase(),
   }).exec(async (err, prereg) => {
@@ -150,7 +153,7 @@ exports.preRegPhone = (req, res) => {
           return;
         } else {
           try {
-            await sendPhoneConfirmation(req, number);
+            // await sendPhoneConfirmation(req, number);
             res.send({ phone: prereg.phone.replace("+", "") });
           } catch (err) {
             res.status(500).send({ message: t("error-again") });
@@ -283,6 +286,10 @@ exports.resendPhoneCode = (req, res) => {
 
 exports.getSelf = (req, res) => {
   console.log(req.userId);
+
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
 
   User.findOne({
     _id: mongoose.Types.ObjectId(req.userId),

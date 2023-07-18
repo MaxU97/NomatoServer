@@ -28,6 +28,12 @@ module.exports = function (app) {
     controller.getRequests
   );
 
+  app.get(
+    "/api/booking/getUnapprovedRequestCount",
+    [authJwt.verifyToken],
+    controller.getUnapprovedRequestCount
+  );
+
   app.post(
     "/api/booking/sendBookingToOwner",
     [authJwt.verifyToken],
