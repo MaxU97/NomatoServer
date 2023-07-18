@@ -232,7 +232,7 @@ exports.sendBookingToOwner = (req, res) => {
       await stripe.paymentIntents.update(req.body.intentID, {
         transfer_group: booking.id,
       });
-      //await sendRequestNotification(booking);
+      await sendRequestNotification(booking);
       booking.save();
       res.status(200).send({ message: t("booking.request-sent-owner") });
     });
