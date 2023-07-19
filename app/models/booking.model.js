@@ -33,6 +33,7 @@ const Booking = mongoose.model(
     intentID: String,
     chargeID: String,
     created: Date,
+    seen: Boolean,
   })
 );
 

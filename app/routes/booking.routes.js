@@ -29,9 +29,9 @@ module.exports = function (app) {
   );
 
   app.get(
-    "/api/booking/getUnapprovedRequestCount",
+    "/api/booking/getUnseenRequestCount",
     [authJwt.verifyToken],
-    controller.getUnapprovedRequestCount
+    controller.getUnseenRequestCount
   );
 
   app.post(
@@ -56,6 +56,12 @@ module.exports = function (app) {
     "/api/booking/approveBooking",
     [authJwt.verifyToken],
     controller.approveBooking
+  );
+
+  app.post(
+    "/api/booking/setAsSeen",
+    [authJwt.verifyToken],
+    controller.setAsSeen
   );
 
   app.post(

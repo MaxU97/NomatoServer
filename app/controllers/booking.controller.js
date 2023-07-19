@@ -190,6 +190,7 @@ exports.recordBooking = (req, res) => {
               extras: item.extras,
               status: req.body.status,
               piid: req.body.client_secret,
+              seen: false
             });
             booking.save();
             res.status(200).send("Booking sent");
@@ -222,6 +223,7 @@ exports.sendBookingToOwner = (req, res) => {
       }
       if (booking.status === "unfinished") {
         booking.status = "approval_required";
+        booking.seen = false;
         booking.intentID = req.body.intentID;
         booking.created = Date.now();
       } else {
@@ -229,12 +231,16 @@ exports.sendBookingToOwner = (req, res) => {
         return;
       }
 
-      await stripe.paymentIntents.update(req.body.intentID, {
-        transfer_group: booking.id,
-      });
-      await sendRequestNotification(booking);
-      booking.save();
-      res.status(200).send({ message: t("booking.request-sent-owner") });
+      try {
+        await stripe.paymentIntents.update(req.body.intentID, {
+          transfer_group: booking.id,
+        });
+        await sendRequestNotification(booking);
+        booking.save();
+        res.status(200).send({ message: t("booking.request-sent-owner") });
+      } catch (e) {
+        console.log('Error sending booking request email notification', e.message);
+      }
     });
 };
 
@@ -321,6 +327,7 @@ exports.getBookingHistory = (req, res) => {
               intentID: item.intentID,
               qtyWant: item.qtyWant,
               status: item.status,
+              seen: item.seen,
               _id: item._id,
             };
           } else {
@@ -334,6 +341,7 @@ exports.getBookingHistory = (req, res) => {
               intentID: item.intentID,
               qtyWant: item.qtyWant,
               status: item.status,
+              seen: item.seen,
               _id: item._id,
             };
           }
@@ -431,6 +439,7 @@ exports.getRequests = (req, res) => {
               intentID: item.intentID,
               qtyWant: item.qtyWant,
               status: item.status,
+              seen: item.seen,
               _id: item._id,
             };
           } else {
@@ -445,6 +454,7 @@ exports.getRequests = (req, res) => {
               intentID: item.intentID,
               qtyWant: item.qtyWant,
               status: item.status,
+              seen: item.seen,
               _id: item._id,
             };
           }
@@ -455,24 +465,43 @@ exports.getRequests = (req, res) => {
     });
 };
 
-exports.getUnapprovedRequestCount = (req, res) => {
+exports.getUnseenRequestCount = async (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
-  Booking.find(
-    {
-      ownerID: mongoose.Types.ObjectId(req.userId),
-      status: { $in: ["approval_required"] },
-    },
-    { piid: 0, saveCard: 0, ownerID: 0 }
-  )
-    .exec(async (err, bookings) => {
-      if (err) {
-        res.status(404).send({ error: t("error") });
+  try {
+    const bookingRequests = await Booking.find(
+      {
+        ownerID: mongoose.Types.ObjectId(req.userId),
+        $or: [
+          { status: { $in: ["approval_required"] } },
+          { 
+            $and: [
+              { status: { $in: ["canceled"] }},
+              { seen: false }
+            ] 
+          }
+        ]
       }
+    ).exec();
 
-      res.send({ count: bookings.length });
+    const myBookings = await Booking.find(
+      {
+        userID: mongoose.Types.ObjectId(req.userId),
+        $and: [
+          { status: { $in: ["approved", "refused"] }},
+          { seen: false }
+        ]
+      }
+    ).exec();
+
+    res.send({ 
+      bookingRequests: bookingRequests.length,
+      myBookings: myBookings.length
     });
+  } catch (err) {
+    res.status(404).send({ error: t("error") });
+  }
 };
 
 exports.cancelBooking = (req, res) => {
@@ -560,6 +589,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
           dateAdded: Date.now(),
         });
         booking.status = "canceled";
+        booking.seen = false;
         finance.save();
         booking.save();
         res.status(200).send({ message: t("booking.half-refund") });
@@ -582,6 +612,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
         });
         finance.save();
         booking.status = "canceled";
+        booking.seen = false;
         booking.save();
         res.status(200).send({ message: t("booking.none-refund") });
       } else {
@@ -613,6 +644,7 @@ const cancelOtherBooking = async (req, res, booking) => {
     if (err.payment_intent) {
       if (err.payment_intent.status == "canceled") {
         booking.status = "canceled";
+        booking.seen = false;
         booking.save();
         res.status(200).send({ message: t("booking.canceled") });
         return;
@@ -646,6 +678,7 @@ exports.refuseBooking = (req, res) => {
       await stripe.paymentIntents.cancel(booking.intentID);
       booking.status = "refused";
       booking.refuseReason = req.body.reason;
+      booking.seen = false;
       booking.save();
       await sendRefusalNotification(booking);
       res.status(200).send({ message: t("booking.refused") });
@@ -680,6 +713,7 @@ exports.approveBooking = (req, res) => {
         );
         booking.chargeID = paymentIntent.charges.data[0].id;
         booking.status = "approved";
+        booking.seen = false;
         booking.save();
       } catch (err) {
         res.status(404).send({ error: t("error") });
@@ -687,6 +721,53 @@ exports.approveBooking = (req, res) => {
       }
       await sendApprovalNotification(booking);
       res.status(200).send({ message: t("booking.approved") });
+    });
+};
+
+exports.setAsSeen = (req, res) => {
+  const t = i18n(
+    req.headers["accept-language"] ? req.headers["accept-language"] : "en"
+  );
+  Booking.findOne({
+    _id: mongoose.Types.ObjectId(req.body.booking_id),
+    status: { $in: ["canceled", "refused", "approved"] },
+    seen: false
+  })
+    .select("ownerID userID status")
+    .exec(async (err, booking) => {
+      if (err) {
+        res.status(404).send({ error: t("error") });
+        return;
+      }
+      if (!booking) {
+        res.status(404).send({ error: t("error") });
+        return;
+      }
+      const ownerID = booking.ownerID.toString();
+      const customerID = booking.userID.toString();
+      console.log('booking found', booking)
+      if (![ownerID, customerID].includes(req.userId)) {
+        console.log('ERROR: not owner or customer')
+        res.status(404).send({ error: t("error") });
+        return;
+      }
+      if (ownerID === req.userId && !["canceled"].includes(booking.status)) {
+        console.log('ERROR: owner can only set as seen booking in "canceled" status')
+        res.status(404).send({ error: t("error") });
+        return;
+      }
+      if (customerID === req.userId && !["refused", "approved"].includes(booking.status)) {
+        console.log('ERROR: customer can only set as seen booking in "refused" or "approved" statuses')
+        res.status(404).send({ error: t("error") });
+        return;
+      }
+      try {
+        booking.seen = true;
+        booking.save();
+        res.status(200).send({ message: "OK" });
+      } catch (err) {
+        res.status(404).send({ error: t("error") });
+      }
     });
 };
 
