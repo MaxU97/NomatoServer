@@ -90,19 +90,37 @@ exports.signin = async (req, res) => {
 };
 
 exports.preRegEmail = (req, res) => {
-  const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
-  if (res.locals.emailExists) {
-    //existing email in prereg database
-    PreReg.findOne({
-      email: req.body.email.toLowerCase(),
-    }).exec((err, prereg) => {
-      if (err) {
-        res.status(500).send({ message: err });
-        return;
-      }
-      prereg.password = bcrypt.hashSync(req.body.password, 8);
-      prereg.emailConfirmNumber = number;
-      prereg.save((err, prereg) => {
+  try {
+    const number = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+    if (res.locals.emailExists) {
+      //existing email in prereg database
+      PreReg.findOne({
+        email: req.body.email.toLowerCase(),
+      }).exec((err, prereg) => {
+        if (err) {
+          res.status(500).send({ message: err });
+          return;
+        }
+        prereg.password = bcrypt.hashSync(req.body.password, 8);
+        prereg.emailConfirmNumber = number;
+        prereg.save((err, prereg) => {
+          if (err) {
+            res.status(500).send({ message: err });
+            return;
+          } else {
+            res.send({ email: prereg.email });
+            sendEmailConfirmation(req.body.email, number);
+            }
+        });
+      });
+    } else {
+      const preReg = new PreReg({
+        email: req.body.email.toLowerCase(),
+        password: bcrypt.hashSync(req.body.password, 8),
+      });
+
+      preReg.emailConfirmNumber = number;
+      preReg.save((err, prereg) => {
         if (err) {
           res.status(500).send({ message: err });
           return;
@@ -111,23 +129,10 @@ exports.preRegEmail = (req, res) => {
           sendEmailConfirmation(req.body.email, number);
         }
       });
-    });
-  } else {
-    const preReg = new PreReg({
-      email: req.body.email.toLowerCase(),
-      password: bcrypt.hashSync(req.body.password, 8),
-    });
-
-    preReg.emailConfirmNumber = number;
-    preReg.save((err, prereg) => {
-      if (err) {
-        res.status(500).send({ message: err });
-        return;
-      } else {
-        res.send({ email: prereg.email });
-        sendEmailConfirmation(req.body.email, number);
-      }
-    });
+    } 
+  } catch(err) {
+    console.log('ERROR WITH PREREG', err)
+    res.send(err);
   }
 };
 

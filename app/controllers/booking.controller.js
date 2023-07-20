@@ -504,34 +504,37 @@ exports.getUnseenRequestCount = async (req, res) => {
   }
 };
 
-exports.cancelBooking = (req, res) => {
+exports.cancelBooking = async (req, res) => {
   const t = i18n(
     req.headers["accept-language"] ? req.headers["accept-language"] : "en"
   );
-  Booking.findOne({
-    userID: mongoose.Types.ObjectId(req.userId),
-    _id: mongoose.Types.ObjectId(req.body.booking_id),
-    status: { $nin: ["with_customer", "canceled", "refused", "returned"] },
-  })
-    .populate("itemID")
-    .populate("ownerID")
-    .populate("extras")
-    .exec((err, booking) => {
-      if (err) {
-        res.status(404).send({ error: t("error") });
-        return;
-      }
-      if (!booking) {
-        res.status(404).send({ error: t("error") });
-        return;
-      }
+  try {
+    if (!req.body.cancelReason) {
+      throw "Cancel reason missing";
+    }
+    const booking = await Booking.findOne({
+      userID: mongoose.Types.ObjectId(req.userId),
+      _id: mongoose.Types.ObjectId(req.body.booking_id),
+      status: { $nin: ["with_customer", "canceled", "refused", "returned"] },
+    })
+      .populate("itemID")
+      .populate("ownerID")
+      .populate("extras")
+      .exec();
 
-      if (booking.status === "approved") {
-        cancelApprovedBooking(req, res, booking);
-      } else {
-        cancelOtherBooking(req, res, booking);
-      }
-    });
+    if (!booking) {
+      throw "No booking found";
+    }
+
+    if (booking.status === "approved") {
+      cancelApprovedBooking(req, res, booking);
+    } else {
+      cancelOtherBooking(req, res, booking);
+    }
+  } catch(err) {
+    console.log("Error", err);
+    res.status(404).send({ error: t("error") });
+  }
 };
 
 const cancelApprovedBooking = async (req, res, booking) => {
@@ -566,6 +569,7 @@ const cancelApprovedBooking = async (req, res, booking) => {
 
   User.findOne({ _id: booking.ownerID._id }).exec(async (err, user) => {
     try {
+      let message;
       if (24 < hoursUntilBooking && hoursUntilBooking < 48) {
         await stripe.transfers.create({
           amount: price / 2,
@@ -573,12 +577,10 @@ const cancelApprovedBooking = async (req, res, booking) => {
           source_transaction: booking.chargeID,
           destination: user.customerID,
         });
-
         await stripe.refunds.create({
           payment_intent: booking.intentID,
           amount: price / 2,
         });
-
         const finance = new Finance({
           user: booking.ownerID._id,
           type: "in",
@@ -588,12 +590,8 @@ const cancelApprovedBooking = async (req, res, booking) => {
           status: "unsettled",
           dateAdded: Date.now(),
         });
-        booking.status = "canceled";
-        booking.seen = false;
         finance.save();
-        booking.save();
-        res.status(200).send({ message: t("booking.half-refund") });
-        return;
+        message = t("booking.half-refund");
       } else if (hoursUntilBooking < 24) {
         await stripe.transfers.create({
           amount: price,
@@ -611,20 +609,20 @@ const cancelApprovedBooking = async (req, res, booking) => {
           dateAdded: Date.now(),
         });
         finance.save();
-        booking.status = "canceled";
-        booking.seen = false;
-        booking.save();
-        res.status(200).send({ message: t("booking.none-refund") });
+        message = t("booking.none-refund");
       } else {
         await stripe.refunds.create({
           payment_intent: booking.intentID,
           amount: price,
           reason: "requested_by_customer",
         });
-        booking.status = "canceled";
-        booking.save();
-        res.status(200).send({ message: t("booking.all-refund") });
+        message = t("booking.all-refund");
       }
+      booking.comment = req.body.cancelReason;
+      booking.status = "canceled";
+      booking.seen = false;
+      booking.save();
+      res.status(200).send({ message: message });
     } catch (err) {
       res.status(500).send({ message: t("error") });
     }
@@ -637,18 +635,19 @@ const cancelOtherBooking = async (req, res, booking) => {
   );
   try {
     const paymentIntent = await stripe.paymentIntents.cancel(booking.intentID);
+    booking.comment = req.body.cancelReason;
+    booking.seen = false;
     booking.status = "canceled";
     booking.save();
     res.status(200).send({ message: t("booking.canceled") });
   } catch (err) {
-    if (err.payment_intent) {
-      if (err.payment_intent.status == "canceled") {
-        booking.status = "canceled";
-        booking.seen = false;
-        booking.save();
-        res.status(200).send({ message: t("booking.canceled") });
-        return;
-      }
+    if (err.payment_intent && err.payment_intent.status == "canceled") {
+      booking.comment = req.body.cancelReason;
+      booking.status = "canceled";
+      booking.seen = false;
+      booking.save();
+      res.status(200).send({ message: t("booking.canceled") });
+      return;
     }
     res.status(500).send({ message: t("error") });
   }
