@@ -122,6 +122,7 @@ exports.preRegEmail = (req, res) => {
       preReg.emailConfirmNumber = number;
       preReg.save((err, prereg) => {
         if (err) {
+          console.error('Prereg save error', err)
           res.status(500).send({ message: err });
           return;
         } else {
@@ -131,7 +132,7 @@ exports.preRegEmail = (req, res) => {
       });
     } 
   } catch(err) {
-    console.log('ERROR WITH PREREG', err)
+    console.error('ERROR WITH PREREG', err)
     res.send(err);
   }
 };

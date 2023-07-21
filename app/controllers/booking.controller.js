@@ -214,10 +214,12 @@ exports.sendBookingToOwner = (req, res) => {
     .populate("itemID")
     .exec(async (err, booking) => {
       if (err) {
+        console.error("sendBookingToOwner:exec:",err)
         res.status(404).send({ error: t("error") });
         return;
       }
       if (!booking) {
+        console.error("sendBookingToOwner:booking:",err)
         res.status(404).send({ error: t("error") });
         return;
       }
@@ -239,7 +241,7 @@ exports.sendBookingToOwner = (req, res) => {
         booking.save();
         res.status(200).send({ message: t("booking.request-sent-owner") });
       } catch (e) {
-        console.log('Error sending booking request email notification', e.message);
+        console.error('Error sending booking request email notification', e.message);
       }
     });
 };
@@ -532,7 +534,7 @@ exports.cancelBooking = async (req, res) => {
       cancelOtherBooking(req, res, booking);
     }
   } catch(err) {
-    console.log("Error", err);
+    console.error("Error", err);
     res.status(404).send({ error: t("error") });
   }
 };
@@ -746,17 +748,17 @@ exports.setAsSeen = (req, res) => {
       const customerID = booking.userID.toString();
       console.log('booking found', booking)
       if (![ownerID, customerID].includes(req.userId)) {
-        console.log('ERROR: not owner or customer')
+        console.error('ERROR: not owner or customer')
         res.status(404).send({ error: t("error") });
         return;
       }
       if (ownerID === req.userId && !["canceled"].includes(booking.status)) {
-        console.log('ERROR: owner can only set as seen booking in "canceled" status')
+        console.error('ERROR: owner can only set as seen booking in "canceled" status')
         res.status(404).send({ error: t("error") });
         return;
       }
       if (customerID === req.userId && !["refused", "approved"].includes(booking.status)) {
-        console.log('ERROR: customer can only set as seen booking in "refused" or "approved" statuses')
+        console.error('ERROR: customer can only set as seen booking in "refused" or "approved" statuses')
         res.status(404).send({ error: t("error") });
         return;
       }
@@ -1074,13 +1076,12 @@ const getPrice = (dateEnd, dateStart, qtyWant, item, extras) => {
 
 exports.checkExpiredBookings = (req, res) => {
   res.status(200).send();
-  console.log();
   Booking.find({
     // created: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
     status: { $in: ["approval_required"] },
   }).exec((err, bookings) => {
     if (!bookings) {
-      console.log("No bookings made more than 24hrs");
+      console.error("No bookings made more than 24hrs");
       return;
     }
 
@@ -1091,7 +1092,7 @@ exports.checkExpiredBookings = (req, res) => {
         booking.refuseReason = "Automatic Refusal";
         booking.save();
       } catch (err) {
-        console.log(err);
+        console.error(err);
       }
     });
   });
