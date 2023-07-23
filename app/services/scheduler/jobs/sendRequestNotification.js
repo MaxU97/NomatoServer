@@ -1,7 +1,9 @@
-module.exports = sendRequestNotification = async (booking) => {
-  const mailer = require("./mailer");
-  require("dotenv").config();
+require("dotenv").config();
+const mailer = require("./mailer");
+const Logger = require("../../logger/logger.service")
+const logger = new Logger("email");
 
+module.exports = sendRequestNotification = async (booking) => {
   var mailOptions = {
     from: `"Nomato" <${process.env.EMAIL}>`,
     to: booking.ownerID.email,
@@ -22,5 +24,8 @@ module.exports = sendRequestNotification = async (booking) => {
       href: process.env.WEBSITE_URL + "requests",
     },
   };
+
+  logger.debug("sendRequestNotification", mailOptions);
+
   mailer(mailOptions);
 };
